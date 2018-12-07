@@ -1,0 +1,339 @@
+#!@perlrun@
+
+# a CPAN distribution utility
+
+use strict;
+use warnings;
+
+use Data::Dumper;
+use Getopt::Long;
+use YAML::Syck;
+
+our $VERSION = '@PACKAGE_VERSION@';
+
+=pod
+
+=head1 NAME
+
+make-cpan-spec.pl
+
+=head1 SYNOPSIS
+
+ @libexecdir/make-cpan-spec.pl --module Some::Module --author 'Rob Lauer <rlauer6@comcast.net>' --abstract 'my wonderful module'
+
+=head1 DESCRIPTION
+
+Utility to help create a CPAN distribution.  This utility is typically
+called from the bash helper script of the same name. The helper script
+will also attempt to resolve dependencies using
+F</usr/lib/rpm/perl.req> if it is available or some other supplied
+script that resolves dependencies and outputs a compatible dependency
+list.
+
+In general, for most uses, the bash script is the way to go.
+
+Assuming you have a working directory that might look like this:
+
+ make-cpan-dist -l lib -t t -m Foo::Bar \
+  -a 'Rob Lauer <rlauer6@comcast.net>' -d 'the Foo::Bar module!'
+
+...might do the trick for you.
+
+=head1 OPTIONS
+
+=over 5
+
+=item -m, --module
+
+Name of the module
+
+=item -b, --buildspec
+
+Name of a build specification file.  The build specification file is
+used instead of options and should be a YAML file that looks something
+like this:
+
+  project:
+    git: https://github.com/rlauer6/perl-Amazon-Credentials
+    description: "AWS credentials discoverer"
+    author:
+      name: Rob Lauer
+      mailto: rlauer6@comcast.net
+  pm_module: Amazon::Credentials
+  path:
+    pm_module: src/main/perl/lib
+    tests: %src/main/perl/t
+
+=item -a, --author
+
+When supplying the author on the command line, include the email
+address in angle brackets as shown in the example.
+
+Example: -a 'Rob Lauer <rlauer6@comcast.net>'
+
+=item -d, --abstract
+
+Short description of the module purpose.
+
+=item -r, --requires
+
+Name of the dependency file list if other than F<requires>.
+
+=item -t, --test-requires
+
+Name of the test dependencies file if other than F<test-requires>.
+
+=item -c, --cleanup
+
+Cleanup temp directories and files.  Default is to cleanup, use
+--no-cleanup if you want to examine some of the temporary files.
+
+=item -v, --version
+
+Returns the version of this script
+
+=back
+
+Note: Set the environment variable C<PRESERVE_MAKEFILE> if you want
+the script to preserver the F<Makefile.PL>.  It will be copied to your
+current working directory.
+
+=head1 DEPENDENCIES
+
+By default dependencies should be listed in files named F<requires>
+and F<test-requires>.  You can specify a different name for the files
+with the C<-r> and C<-t> options. The F<requires> file is
+mandatory. If you use the bash script that invokes this utility it
+will create these files for you.  Modules should be listed as:
+
+  module-name, version
+
+Example:
+
+ AWS::Signature4,1.02
+ ...
+
+=head1 AUTHOR
+
+Rob Lauer - <rlauer6@comcast.net>
+
+=cut
+
+
+sub get_requires {
+  my $requires = shift;
+  
+  open my $fh, "<" . $requires or die "Could not get pre-requisites ($requires)\n";
+
+  my %modules;
+  
+  while (<$fh>) {
+    chomp;
+    my ($module, $version) = split /\s/;
+    $modules{$module} = $version;
+  }
+  
+  close $fh;
+  
+  return \%modules;
+}
+
+sub get_modules {
+  my $module_list = shift;
+  
+  my @modules;
+  
+  open my $fh, "<", $module_list or die "Could not open module list\n";
+  while (<$fh>) {
+    chomp;
+    push @modules, $_;
+  }
+  
+  close $fh;
+  
+  return \@modules;
+}
+
+sub help {
+  print <<eot;
+usage: $0 OPTIONS
+
+Example: $0 -m Some::Module -a 'Rob Lauer <rlauer6\@comcast.net>' -d 'my wonderful module'
+
+OPTIONS
+-------
+-m, --module        module name
+-b, --buildspec     read a buildspec and create command line
+-a, --author        author
+-d, --abstract      abstract
+-r, --requires      dependency list
+-M, --module-list   list of modules to include in distribution
+-t, --test-requires test dependencies
+-c, --cleanup       cleanup files, this is default
+                    use --no-cleanup to prevent cleanup
+-v, --version       version
+
+Typically, this script is called from the bash helper script of the same
+name (make-cpan-dist) or is invoked with a YAML file that specifies
+the parmeters used to build a distribution.
+
+See https://github.com/rlauer6/perl-Amazon-Credentials for complete
+documentation.
+
+See man make-cpan-dist
+
+eot
+}
+
+my %options = (cleanup => 1 );
+
+GetOptions(\%options,
+           "module=s",
+           "abstract|d=s",
+           "author|a=s",
+           "requires=s",
+           "test-requires=s",
+           "version=s",
+           "verbose|V",
+           "buildspec=s",
+           "cleanup!",
+           "help=s"
+          );
+
+if ( $options{version} ) {
+  print "make-cpan-dist.pl v$VERSION\n";
+  exit;
+}
+
+if ( $options{buildspec} ) {
+  die "file not found or empty " . $options{buildspec} . "\n"
+    unless -s $options{buildspec};
+  
+  my $buildspec = eval {
+    LoadFile($options{buildspec});
+  };
+  
+  die "could not read " . $options{buildspec} . "\n$@\n"
+    if $@;
+
+  #version: 0.1
+  #
+  #project:
+  #  git: https://github.com/rlauer6/perl-Amazon-Credentials
+  #  description: "AWS credentials discoverer"
+  #  author:
+  #    name: Rob Lauer
+  #    mailto: rlauer6@comcast.net
+  #pm_module: Amazon::Credentials
+  #path:
+  #  pm_module: src/main/perl/lib
+  #  tests: %src/main/perl/t
+  #destdir: directory for output
+  
+  my %args;
+  
+  # -m 
+  if ( $buildspec->{pm_module} ) {
+    $args{m} = $buildspec->{pm_module};
+  }
+  
+  if ( $buildspec->{project} ) {
+    # -a 
+    if ( $buildspec->{project}->{author} ) {
+      $args{a} = $buildspec->{project}->{author}->{name};
+      $args{a} .= " <" . $buildspec->{project}->{author}->{mailto} . ">"
+        if $buildspec->{project}->{author}->{mailto};
+      
+      $args{a} = sprintf("'%s'", $args{a});
+    }
+    
+    # -d
+    $args{d} = sprintf("'%s'", $buildspec->{project}->{description}) 
+      if $buildspec->{project}->{description};
+    
+    # -g
+    $args{g} = $buildspec->{project}->{git} 
+      if $buildspec->{project}->{git};
+  }
+
+  if ( $buildspec->{path} ) {
+    # -l
+    $args{l}= $buildspec->{path}->{pm_module}
+      if $buildspec->{path}->{pm_module};
+    
+    # -t
+    $args{t}= $buildspec->{path}->{tests}
+      if $buildspec->{path}->{tests};
+  }
+  
+  foreach (keys %args) {
+    $args{"-$_"} = $args{$_};
+    delete $args{$_};
+  }
+  
+  $args{'-v'} = ''
+    if $options{verbose};
+
+  $args{'-o'} = $buildspec->{destdir}
+    if $buildspec->{destdir};
+
+  $args{'-x'} = ''
+    if ! $options{'cleanup'};
+  
+  exec '@bindir@/make-cpan-dist ' . join(" ", %args);
+}
+
+my $module=$options{module};
+my $author = $options{author} || 'Anonyous <anonymous6@example.com>';
+my $abstract = $options{abstract} || 'my awesome Perl module!';
+
+if ( $options{help} || ! ($module && $author && $abstract) ) {
+  help;
+  exit;
+}
+
+die "no dependencies\n"
+  unless $options{requires};
+
+while ($module =~s/::/\//g) {}
+$module = 'lib/' . $module . '.pm';
+
+$Data::Dumper::Terse = 1;
+$Data::Dumper::Sortkeys = 1;
+$Data::Dumper::Indent = 2;
+$Data::Dumper::Pad = ' '  x 4;
+
+$options{requires} = $options{requires} || 'requires';
+$options{'test-requires'} = $options{'test-requires'} || 'test-requires';
+
+my $pre_req =  Dumper get_requires($options{requires});
+$pre_req =~s/^\s*(.*?)$/$1/m;
+
+my $test_req = {};
+
+if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
+  $test_req = Dumper get_requires($options{'test-requires'});
+  $test_req =~s/^\s*(.*?)$/$1/m;
+}
+else {
+  $test_req = Dumper {};
+}
+
+print <<eot;
+
+use strict;
+use warnings;
+use ExtUtils::MakeMaker;
+
+WriteMakefile(
+    NAME           => '$options{module}',
+    AUTHOR         => '$author',
+    VERSION_FROM   => '$module',
+    ABSTRACT       => '$abstract',
+    LICENSE        => 'perl',
+    PL_FILES       => {},
+    PREREQ_PM      => $pre_req,
+    TEST_REQUIRES  => $test_req
+);
+eot
+

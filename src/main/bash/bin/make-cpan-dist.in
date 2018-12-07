@@ -1,0 +1,277 @@
+#!@bashrun@
+# -*- mode: sh; -*-
+
+# look for project home directory from here back, sets PROJECT_HOME
+function find_git_home {
+    project_home="..";
+    git_home=""
+
+    while true; do
+        git_home=$(find "$project_home" -type d -path "*/.git");
+
+        PROJECT_HOME=$(cd $project_home; pwd)
+        test -n "$git_home" && break;
+
+        project_home="../$project_home"
+
+        if [ "$PROJECT_HOME" = "/" ]; then
+            PROJECT_HOME=""
+            break;
+        fi
+    done
+}
+
+# cleanup on exit
+function cleanup {
+
+    test -n "$NOCLEANUP" && return;
+    
+    test -n "$testsfile" && rm "$testsfile"
+    test -n "$tmp_gitdir" && rm -rf "$tmp_gitdir"
+    
+    if test -n "$workdir"; then
+        for a in requires test-requires provides; do
+            rm -f ${workdir}/$a ${workdir}/$a.tmp
+        done
+    fi
+
+    test -n "$builddir" && rm -rf "$builddir"
+}
+
+function usage {
+    test -n "$1" && echo "error: $1";
+    echo "usage: make-cpan-dist Options"
+    echo ""
+    echo "Utility to create a CPAN distribution"
+    echo ""
+    echo "Options"
+    echo "-------"
+    echo "-a author"
+    echo "-d description"
+    echo "-h help"
+    echo "-l path to Perl modules"
+    echo "-m module name"
+    echo "-o output directory (default: current directory)"
+    echo "-p preserve Makefile.PL"
+    echo "-r function to list dependencies"
+    echo "-t path to test files"
+    echo "-v more verbose output"
+    echo "-x do not cleanup files"
+    echo ""
+    echo "NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables."
+    
+    exit;
+}
+
+# default dependency finder
+function perl_requires {
+    /usr/lib/rpm/perl.req "$1" | perl -npe 's/^perl\((.*)\)/$1/'
+}
+
+# attempts to grab module versions
+function get_module_versions {
+    infile="$1"
+    
+    if ! test -e "$infile"; then
+        echo "file $infile not found!"
+        return;
+    fi
+    
+    for a in $(sort -u "$infile" | perl -npe 's/^perl\((.*)\)$/$1/;'); do
+        perl -I ${perl5libdir} -M$a -e 'print "'$a'"," ", $'$a'::VERSION,"\n";';
+    done
+}
+
+# +--------------------+
+# | SCRIPT STARTS HERE |
+# +--------------------+
+
+set -e
+
+OPTS=$(getopt -o phg:t:a:m:d:r:l:o:vx -- "$@")
+
+if [ $? -ne 0 ]; then
+    echo "could not parse options"
+    exit $?
+fi
+
+eval set -- "$OPTS"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -x)
+            NOCLEANUP="$1";
+            shift;
+            ;;
+        -p)
+            PRESERVE_MAKEFILE="$1";
+            shift;
+            ;;
+        -v)
+            VERBOSE="$1";
+            shift;
+            ;;
+        -o)
+            destdir="$2";
+            shift;
+            shift;
+            ;;
+        -a)
+            author="$2";
+            shift;
+            shift;
+            ;;
+	-h)
+	    usage;
+	    ;;
+        -m)
+            module="$2";
+            shift;
+            shift;
+            ;;
+        -d)
+            description="$2";
+            shift;
+            shift;
+            ;;
+        -g)
+            git_project="$2";
+            shift;
+            shift;
+            ;;
+        -l)
+            perl5libdir="$2";
+            shift;
+            shift;
+            ;;
+        -r)
+            PERL_REQUIRES="$2";
+            shift;
+            shift;
+            ;;
+        -t)
+            testsdir="$2";
+            shift;
+            shift;
+            ;;
+	--)
+	    break;
+	    ;;
+	*)
+	    break;
+	    ;;
+    esac
+done
+
+shift;
+
+test -z "$module" && usage "no module specified";
+test -z "$author" && usage "no author specified";
+test -z "$description" && usage "no description";
+
+# tarball destination directory
+destdir=${destdir:-$(pwd)}
+
+if test -n "$git_project"; then
+    tmp_gitdir=$(mktemp -d)
+    PROJECT_HOME=$tmp_gitdir
+    git clone $git_project $PROJECT_HOME
+    cd $PROJECT_HOME
+    autoreconf -i --force && ./configure && make
+else
+    PROJECT_HOME=$(pwd)
+fi
+
+if test -z "$PROJECT_HOME"; then
+    usage "could not find project home"
+fi
+
+# typical directory containing Perl modules
+perl5libdir=${perl5libdir:-src/main/perl/lib}
+
+# program that will provide the dependency list
+PERL_REQUIRES=${PERL_REQUIRES:-perl_requires}
+
+builddir=$(mktemp -d)
+
+trap cleanup EXIT
+
+module_file="$(echo "$module" | perl -npe "s/::/\//g").pm"
+
+mkdir -p ${builddir}/lib/$(dirname $module_file);
+    
+if ! test -e "${PROJECT_HOME}/${perl5libdir}/$module_file"; then
+    echo "no "${PROJECT_HOME}/${perl5libdir}/$module_file" found!"
+    exit;
+fi
+
+workdir=$(pwd)
+
+for a in $(find ${PROJECT_HOME}/${perl5libdir} -name '*.pm'); do
+    required_module=${a##${PROJECT_HOME}/${perl5libdir}/}
+    echo $required_module >> ${workdir}/provides.tmp
+    mkdir -p $(dirname ${builddir}/lib/$required_module)
+    cp $a ${builddir}/lib/$required_module
+    $PERL_REQUIRES $a >> ${workdir}/requires.tmp
+done
+
+cat ${workdir}/provides.tmp | perl -npe 's/\//::/g; s/\.pm$//;' | sort > ${workdir}/provides
+sort -u ${workdir}/requires.tmp > ${workdir}/requires
+
+# remove provided files from required list
+comm -23 ${workdir}/requires ${workdir}/provides > ${workdir}/requires.tmp
+
+# get the module versions we are currently using
+get_module_versions ${workdir}/requires.tmp > ${workdir}/requires
+
+if test -n "$testsdir"; then
+    if test -d "$testsdir"; then
+        testsfile=$(mktemp);
+        ls -1 ${testsdir}/*.t >$testsfile 2>/dev/null || true
+        if test -s "$testsfile"; then
+            mkdir ${builddir}/t
+        
+            for a in $(cat $testsfile); do
+                cp $PROJECT_HOME/$a ${builddir}/t/
+                $PERL_REQUIRES $PROJECT_HOME/$a >> ${workdir}/test-requires.tmp
+            done
+            
+            get_module_versions test-requires.tmp > ${workdir}/test-requires
+        else
+            rm -f "$testsfile";
+            testsfile="";
+        fi
+    fi
+fi
+
+test -n "$VERBOSE" && cat ${workdir}/requires
+test -n "$VERBOSE" && test -e ${workdir}/test-requires && cat ${workdir}/test-requires
+
+# create the Makefile.PL
+PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
+            -r ${workdir}/requires \
+            -t ${workdir}/test-requires \
+            -m "$module" \
+            -d "$description" \
+            -a "$author" > $builddir/Makefile.PL
+
+# if that was successful, then try to build the distribution
+if ! test -e $builddir/Makefile.PL; then
+    echo "failed to build Makefile.PL"
+    exit;
+else
+    cd $builddir
+    test -n "$VERBOSE" && tree
+    test -n "$VERBOSE" && cat Makefile.PL
+    
+    echo "destdir: $destdir"
+    
+    if perl Makefile.PL; then
+        test -n "$PRESERVE_MAKEFILE" && cp Makefile.PL $destdir
+        make manifest
+        make dist
+        cp *.tar.gz $destdir
+        make test
+        echo "try cpan-upload-http $(ls -1rt *.tar.gz | tail -1)"
+    fi
+fi

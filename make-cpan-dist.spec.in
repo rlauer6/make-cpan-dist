@@ -1,0 +1,85 @@
+%define project_base     @PACKAGE_NAME@
+%define project_version  @VERSION@
+%define pkgname          %{project_base}-%{project_version}
+%define buildroot        %{_tmppath}/%{pkgname}-%(%{__id_u} -n)
+
+Name:       %{project_base}
+Version:    %(echo @VERSION@ | awk -F- '{print $1}')
+Release:    %(echo @VERSION@ | awk -F- '{if (length($2) == 0) {print "0" } else { print $2 } }')
+License:    GNU Public License 
+Vendor:     TBC Development Group, LLC 
+Source:     %{project_base}-%{project_version}.tar.gz
+
+BuildArch:  noarch
+
+%define _prefix         /usr
+%define _sysconfdir     %{_prefix}/etc
+%define _datadir        %{_prefix}/share
+%define _localstatedir  %{_prefix}/var
+%define _mandir         %{_prefix}/man
+%define _infodir        %{_prefix}/info
+%define _libdir         %{_prefix}/lib
+%define _bindir         %{_prefix}/bin
+%define _libexecdir     %{_prefix}/libexec
+%define _sbindir        %{_prefix}/sbin
+%define _includedir     %{_prefix}/include
+%define _perl5libdir    %(perl -e 'use Config; print $Config{installsitelib};')
+
+# %define vhostdir        /var/www/vhosts
+
+BuildRoot:  %{buildroot}
+Prefix:     %{_prefix}
+
+### END OF BOILERPLATE HEADER ###
+
+BuildRequires: automake autoconf
+
+#--------------------------------------------------------------------#
+
+Summary:  @PACKAGE@
+Group:    Development/Tools 
+
+%description
+
+@PACKAGE_DESCRIPTION@
+
+%prep
+%setup -q -n %{pkgname}
+
+%build
+./configure --prefix=/usr \
+            --sysconfdir=/etc \
+	    --with-perl5libdir=yes \
+            --enable-rpmbuild
+make
+
+# Pre-installation steps go here
+%pre
+
+# Post installation steps go here
+%post
+
+%install
+rm -fr %{buildroot}
+make DESTDIR=%{buildroot} install
+
+%files
+%defattr(-,root,root)
+
+%{_libexecdir}/
+%{_datadir}/man/
+
+# Our perl modules
+# %{_perl5libdir}/*
+
+# Executables run by the user go in bin
+%{_bindir}/*
+
+# Executables run by the system (e.g. daemons) go in sbin
+# %{_sbindir}/*
+
+# Resources (README's, init scripts, reference materials, etc. go in resources)
+# %{_datadir}/resources/%{project_base}
+
+# Most config files should be sacred
+# %config(noreplace) /etc/*

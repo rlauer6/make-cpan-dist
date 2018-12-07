@@ -1,0 +1,28 @@
+Thu Dec  6 21:15:56 2018  Rob Lauer  <rlauer6@comcast.net>
+
+	[first import]:
+	* .gitignore: new
+	* ChangeLog: new
+	* Makefile.am: new
+	* README.md: new
+	* autotools/ads_PERL_INCLUDES.m4: new
+	* autotools/ads_PERL_MODULE.m4: new
+	* autotools/ads_PROG_PERL.m4: new
+	* autotools/am_build_mode.m4: new
+	* autotools/ax_am_conditional_example.m4: new
+	* autotools/ax_deps_check.m4: new
+	* autotools/ax_distcheck_hack.m4: new
+	* autotools/install-sh: new
+	* autotools/missing: new
+	* configure.ac: new
+	* directories.inc: new
+	* make-cpan-dist.spec.in: new
+	* src/Makefile.am: new
+	* src/main/Makefile.am: new
+	* src/main/bash/Makefile.am: new
+	* src/main/bash/bin/Makefile.am: new
+	* src/main/bash/bin/make-cpan-dist.in: new
+	* src/main/perl/Makefile.am: new
+	* src/main/perl/bin/Makefile.am: new
+	* src/main/perl/bin/make-cpan-dist.pl.in: new
+	* src/main/perl/lib/Makefile.am: new
