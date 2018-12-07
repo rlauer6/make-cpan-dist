@@ -21,7 +21,7 @@ part is key, as I'd like this to simply be the tail end of a CI/CD
 pipeline.
 
 To be clear, __this is not a comprehensive CPAN distribution creation
-utility__ and almost certainly will not work more complex Perl
+utility__ and almost certainly will not work for more complex Perl
 modules.  It does the basics, and just the basics to create a CPAN tar
 ball.  If you have one or more Perl modules that need to get packaged
 up as part of a namespace you own, then this _might_ work for you.  If
@@ -61,7 +61,7 @@ using a RedHat derived Linux distribution, install the `autoconf`
 package using `yum`. If you are using a Debian based system then you
 may have success using `apt` to install the project. This may not be
 important to you but the project (`make-cpan-dist`) itself can create
-an rpm file.
+an rpm file._
 
 ```
 autreconf -i --force
@@ -70,7 +70,7 @@ make && make dist
 rpmbuild -tb make-cpan-dist-1.0.0.tar.gz
 ```
 
-You won't be able create a Debian package from this package as it only
+_You won't be able create a Debian package from this package as it only
 supports creation of an rpm. You should still be able to build and
 install the utility from source on either platform._
 
@@ -89,9 +89,10 @@ configure process._
 ./configure --prefix=$HOME/local
 make && make install
 ```
-## Why did you _autoconfiscate_ this project that has just 1 Perl script and 1 bash script?
 
-In no particular order...
+## Why did you _autoconfiscate_ a project that has just 1 Perl script and 1 bash script?
+
+Before we go any further, I'll bet I need to answer that question.  So, in no particular order...
 
 * Habit
 * Automation malleability
@@ -230,7 +231,6 @@ Assume my source tree looks something like this:
 
 ```
 .
-├── buildspec.yml
 ├── lib
 │   └── Foo
 │       └── Bar.pm
@@ -278,26 +278,28 @@ Amazon::Signature4,1.02
 ```
 
 Of course, at this point you might as well just create your own
-`Makefile.PL` I guess...otoh hand if you are in to automation and
-creating `make` files then put your dependency files under source
-control and make them dependencies for your `make` rules.  ;-)
+`Makefile.PL` I guess...OTOH hand if you are big on automation (you
+should be) and creating `make` files (what? nobody uses `make`
+anymore?) then put your dependency files under source control and make
+them dependencies for your `make` rules.  ;-)
 
 So, just to be transparent, the bash helper script does the following,
 all of which you can of course do manually to create your dependency
 list.
 
 1. iterate over all of the .pm files in your source tree
-  1. run `/usr/lib/rpm/perl.req` and save the output
+   1. run `/usr/lib/rpm/perl.req` and save the output
 1. sort the list and get the unique dependencies
 1. iterate over the sorted list
-  1. get the version number of each module
-  1. save the module and verion number to the dependency file
+   1. get the version number of each module
+   1. save the module and verion number to the dependency file
 1. repeat for each test (*.t) in the test directory
 
 The result of the above operation is the two files (`requires`,
-`test-requires`) you need to provide to the script.  These are then
-used to populate the template of the `Makefile.PL` program generated
-in the Perl script `make-cpan-dist.pl`.
+`test-requires`) you'll need to provide to the script.  The contents
+of the files are then used to populate the template for the
+`Makefile.PL` program generated in the Perl script
+`make-cpan-dist.pl`.
 
 # Finally
 
