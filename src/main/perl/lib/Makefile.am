@@ -2,13 +2,9 @@ SUBDIRS = .
 
 include $(top_srcdir)/directories.inc
 
-perlrun = @PERL@
+perlrun = @ENV@ @PERL@
 
-if RPM_BUILD_MODE
-perlwc = \# 
-else
-perlwc = @PERL@
-endif
+perlwc = @ENV@ @PERL@
 
 # you should be using perl5libdir as the base target of your perl
 # modules, not as simply part of your PERLINCLUDE
@@ -67,13 +63,4 @@ clean-generated-man-pages:
 	rm -f "$${mpath}" ;\
 	test $$? -eq 0 || exit 1 ;\
 	done
-
-if DISTCHECK_HACK
-else
-endif
-
-if RPM_BUILD_MODE
-else
-install-data-hook:
-endif
 

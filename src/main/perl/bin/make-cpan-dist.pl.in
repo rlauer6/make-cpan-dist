@@ -7,6 +7,7 @@ use warnings;
 
 use Data::Dumper;
 use Getopt::Long;
+use File::Temp qw/:POSIX/;
 use YAML::Syck;
 
 our $VERSION = '@PACKAGE_VERSION@';
@@ -228,6 +229,9 @@ if ( $options{buildspec} ) {
   #path:
   #  pm_module: src/main/perl/lib
   #  tests: %src/main/perl/t
+  #  extra: extra-files
+  #  extra-files:
+  #    ../ChangeLog
   #destdir: directory for output
   
   my %args;
@@ -280,11 +284,41 @@ if ( $options{buildspec} ) {
   $args{'-x'} = ''
     if ! $options{'cleanup'};
   
+  if ($buildspec->{extra}) {
+    $args{'-f'} = $buildspec->{extra};
+  }
+
+  if ( $buildspec->{'extra-files'} ) {
+    my $extra_files = $buildspec->{extra} || 'extra-files';
+    
+    open (my $fh, ">>$extra_files") or
+      die "could not append to $extra_files\n";
+    
+    
+    foreach (@{$buildspec->{'extra-files'}}) {
+      print $fh "$_\n";
+    }
+    
+    close $fh;
+    $args{'-f'} = "$extra_files";
+  }
+  
+  if ( $buildspec->{provides} ) {
+    open (my $fh, ">provides");
+    
+    foreach (@{$buildspec->{provides}}) {
+      print $fh "$_\n";
+    }
+    
+    close $fh;
+    $args{'-P'} = "provides";
+  }
+  
   exec '@bindir@/make-cpan-dist ' . join(" ", %args);
 }
 
 my $module=$options{module};
-my $author = $options{author} || 'Anonyous <anonymous6@example.com>';
+my $author = $options{author} || 'Anonyous <anonymous@example.com>';
 my $abstract = $options{abstract} || 'my awesome Perl module!';
 
 if ( $options{help} || ! ($module && $author && $abstract) ) {

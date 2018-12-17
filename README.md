@@ -59,9 +59,7 @@ packaging and the tests that go along with the distribution.
 _Make sure you have the `autotools` tool chain installed. If you are
 using a RedHat derived Linux distribution, install the `autoconf`
 package using `yum`. If you are using a Debian based system then you
-may have success using `apt` to install the project. This may not be
-important to you but the project (`make-cpan-dist`) itself can create
-an rpm file._
+may have success using `apt` to install the project.
 
 ```
 autreconf -i --force
@@ -292,7 +290,7 @@ list.
 1. sort the list and get the unique dependencies
 1. iterate over the sorted list
    1. get the version number of each module
-   1. save the module and verion number to the dependency file
+   1. save the module and version number to the dependency file
 1. repeat for each test (*.t) in the test directory
 
 The result of the above operation is the two files (`requires`,

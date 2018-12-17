@@ -1,3 +1,37 @@
+Mon Dec 17 09:28:00 2018  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.1.0]: support for -f, -P, -R
+
+	* bootstrap: new
+	* Makefile.am
+	- remove rpm packaging features
+	* README.md
+	* configure.ac
+	- bump
+	- perlenv, PERL_REQUIRES, ENV
+	- removed rpm packaging features
+	* src/main/bash/bin/Makefile.am
+	- make perlrun = perlenv
+	* src/main/perl/bin/Makefile.am
+	- likewise
+	- install scripts to bin_SCRIPTS
+	- remove rpm packaging features
+	* src/main/perl/lib/Makefile.am
+	- make perlrun = perlenv
+	- remove rpm packaging features
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- added support for including extra files
+	- added support for provides file
+	* src/main/bash/bin/make-cpan-dist.in
+	(usage)
+	- added -f (extra-files)
+	- added -P (provides)
+	- added -R (recurse directories for files)
+	(get_module_versions)
+	- assume verion 0 if can't get version
+	(main)
+	- do not include provided files in test requires list
+
 Thu Dec  6 21:15:56 2018  Rob Lauer  <rlauer6@comcast.net>
 
 	[first import]:

@@ -1,4 +1,4 @@
-AC_INIT([make-cpan-dist], [1.0.0], [rlauer6@comcast.net])
+AC_INIT([make-cpan-dist], [1.1.0], [rlauer6@comcast.net])
 
 __poor_mans_expand_file_name () {
     _tmp_name=$1
@@ -59,6 +59,7 @@ do_subst_command='do_subst = sed \
 \
   -e '"'"'s,[@]perl5libdir[@],$(perl5libdir),g'"'"' \
   -e '"'"'s,[@]perlrun[@],$(perlrun),g'"'"' \
+  -e '"'"'s,[@]perlenv[@],$(perlenv),g'"'"' \
   -e '"'"'s,[@]ksh[@],$(ksh),g'"'"' \
   -e '"'"'s,[@]bashrun[@],$(bashrun),g'"'"' \
   -e '"'"'s,[@]logdir[@],$(logdir),g'"'"' \
@@ -66,6 +67,8 @@ do_subst_command='do_subst = sed \
   -e '"'"'s,[@]SMTP_SERVER[@],$(SMTP_SERVER),g'"'"' \
 \
   -e '"'"'s,[@]SOME_THINGY[@],$(SOME_THINGY),g'"'"' \
+\
+  -e '"'"'s,[@]PERL_REQUIRES[@],$(PERL_REQUIRES),g'"'"' \
 '
 ]
 
@@ -81,6 +84,20 @@ AC_PATH_PROG([BASHRUN],
 
 if test -z "$BASHRUN" ; then 
   AC_MSG_ERROR([bash not found?])
+fi
+
+AC_PATH_PROG([ENV],
+	[env])
+
+if test -z "$ENV" ; then 
+  AC_MSG_ERROR([env not found?])
+fi
+
+AC_PATH_PROG([PERL_REQUIRES],
+	[perl.req],[],[$PATH$PATH_SEPARATOR/usr/lib/rpm])
+
+if test -z "$PERL_REQUIRES" ; then 
+  AC_MSG_ERROR([perl.req not found?])
 fi
 
 AC_PATH_PROG([POD2MAN],
@@ -121,13 +138,10 @@ dnl ads_PERL_MODULE([Bedrock], [REQUIRE], [1.3])
 
 dnl example macro that enables allows you to enable/disable some feature
 dnl --enable-some-thingy, --disable-some-thingy : see the autotools/ax_am_conditional_example.m4 macro
-AX_SOME_THINGY
 
 AX_DISTCHECK_HACK
 AX_DEPS_CHECK
 AX_PERLDEPS_CHECK
-
-RPM_BUILD_MODE
 
 AC_CONFIG_FILES([
     Makefile
@@ -138,7 +152,6 @@ AC_CONFIG_FILES([
     src/main/perl/lib/Makefile
     src/main/bash/Makefile
     src/main/bash/bin/Makefile
-    ${PACKAGE_NAME}.spec
 ])
 
 AC_OUTPUT
@@ -152,7 +165,6 @@ printf "           Configuration files: %s\n" "`__poor_mans_expand_file_name sys
 printf "                  Manual pages: %s\n" "`__poor_mans_expand_file_name mandir`"
 printf "\n"
 printf "                   perl5libdir: %s\n" "`__poor_mans_expand_file_name perl5libdir`"
-printf "            Enable some thingy: %s\n" "`__poor_mans_expand_file_name SOME_THINGY_ENABLED`"
 printf "\n"
 printf "                          perl: %s\n" "`__poor_mans_expand_file_name PERL`"
 printf "                          bash: %s\n" "`__poor_mans_expand_file_name BASHRUN`"
