@@ -59,10 +59,10 @@ mention I'm using this as part of a CI/CD pipeline?
 
 ## Installation
 
-_Make sure you have the `autotools` tool chain installed. If you are
+Make sure you have the `autotools` tool chain installed. If you are
 using a RedHat derived Linux distribution, install the `autoconf`
 package using `yum`. If you are using a Debian based system then you
-may have success using `apt` to install the project.
+may have success using `apt` to install the necessary dependencies.
 
 ```
 yum install -y autoconf
@@ -114,15 +114,23 @@ clean-local:
 make cpan
 ```
 
+I also leverage _autoconfiscation_ templates to create things like man
+pages from Perl scripts and of course the installation process is made
+simpler when you can rely on some degree of portability and
+standardization of your toolchain. Many disagree and hate `autoconf` -
+I get it - but it's not a holy war.
+
 ## Perl Dependencies
 
 To use these scripts you'll also need a way to _resolve Perl module
 dependencies_.  The script will use, by default, Red Hat's utility
 that is bundled in its `rpm-build` package (`/usr/lib/rpm/perl.req`).
 I find that this utility does a fairly good job of figuring out the
-direct dependencies.  In fact, it does a much better job than
+__direct__ dependencies.  In fact, it does a much better job than
 `scandeps.pl` or any of the other dependency resolvers you might
-stumble across.
+stumble across.  That's not to say that it is fool proof or even a
+good dependency checker for Perl.  That is a subject of a long blog
+post I think I should write some day.
 
 If you are running on a Debian based system you can grab
 `/usr/lib/rpm/perl.req` from the `rpm` package apparently.
