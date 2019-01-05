@@ -49,14 +49,16 @@ function usage {
     echo "-------"
     echo "-a author      - author (ex: Anonymouse <anonymouse@example.org>)"
     echo "-d description - description to be included CPAN"
+    echo "-D file        - use file as the dependency list"
     echo "-h             - help"
-    echo "-f fiel        - list of extra file to include"
+    echo "-f file        - file containing a list of extra files to include"
     echo "-l path        - path to Perl modules"
-    echo "-m naem        - module name"
+    echo "-m name        - module name"
     echo "-o dir         - output directory (default: current directory)"
     echo "-p             - preserve Makefile.PL"
     echo "-P file        - file that contains a list of modules to be packaged"
-    echo "-r pgm         - script or programgr list dependencies"
+    echo "-r pgm         - script or program to list dependencies"
+    echo "-s             - use scandeps.pl to find dependncies"
     echo "-R yes/no      - recurse directories for files to package (default: yes)"
     echo "-t path        - path to test files"
     echo "-v             - more verbose output"
@@ -98,9 +100,7 @@ function get_module_versions {
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-set -e
-
-OPTS=$(getopt -o phg:t:a:m:d:r:l:o:vxf:R:P: -- "$@")
+OPTS=$(getopt -o D:sphg:t:a:m:d:r:l:o:vxf:R:P: -- "$@")
 
 if [ $? -ne 0 ]; then
     echo "could not parse options"
@@ -109,8 +109,20 @@ fi
 
 eval set -- "$OPTS"
 
+set -e
+
 while [ $# -gt 0 ]; do
     case "$1" in
+        -D)
+            dependency_file="$2";
+            shift;
+            shift;
+            ;;
+        
+        -s)
+            PERL_REQUIRES="SCANDEPS"
+            shift;
+            ;;
         -R)
             recurse_directories="$2";
             shift;
@@ -207,7 +219,10 @@ if test -n "$git_project"; then
     PROJECT_HOME=$tmp_gitdir
     git clone $git_project $PROJECT_HOME
     cd $PROJECT_HOME
-    autoreconf -i --force && ./configure && make
+    set -e -o pipeline
+    if test -e configure.ac; then
+        autoreconf -i --force && ./configure --with-perlibdir=yes && make
+    fi
 else
     PROJECT_HOME=$(pwd)
 fi
@@ -216,7 +231,7 @@ if test -z "$PROJECT_HOME"; then
     usage "could not find project home"
 fi
 
-# typical directory containing Perl modules
+# typical directory within project tree containing Perl modules
 perl5libdir=${perl5libdir:-src/main/perl/lib}
 
 # program that will provide the dependency list
@@ -261,18 +276,48 @@ else
             exit 1;
         fi
     else
-        echo "no provides file found"
-        exit 1
+        echo "$module.pm" > $package_files
     fi
 fi
 
-for a in $(cat $package_files); do
-    required_module=${a##${PROJECT_HOME}/${perl5libdir}/}
-    echo $required_module >> ${workdir}/provides.tmp
-    mkdir -p $(dirname ${builddir}/lib/$required_module)
-    cp $a ${builddir}/lib/$required_module
-    $PERL_REQUIRES $a >> ${workdir}/requires.tmp
-done
+if test -z "$dependency_file"; then
+    for a in $(cat $package_files); do
+        required_module=${a##${PROJECT_HOME}/${perl5libdir}/}
+        echo $required_module >> ${workdir}/provides.tmp
+        mkdir -p $(dirname ${builddir}/lib/$required_module)
+        cp $a ${builddir}/lib/$required_module
+        
+        if [ "$PERL_REQUIRES" = "SCANDEPS" ]; then
+            if test -z "@scandeps@"; then
+                echo "no scandeps.pl found!"
+                exit 1
+            else
+                set -o pipefail
+                if ! @scandeps@ -Rc $a | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" >>${workdir}/requires.tmp; then
+                    echo "ERROR: could not resolve dependencies for $a"
+                    exit 1;
+                fi
+            fi
+        else
+            $PERL_REQUIRES $a >> ${workdir}/requires.tmp
+        fi
+    done
+else
+    if [ $(basename $dependency_file) = "cpanfile" ]; then
+        if test -n $(which cpanfile-dump 2>/dev/null); then
+            cpanfile-dump "$dependency_file" >${workdir}/requires.tmp
+        else
+            echo "WARNING: cpanfile-dump not found!"
+        fi
+    else
+        cat $dependency_file > ${workdir}/requires.tmp
+    fi
+fi
+
+if ! test -s ${workdir}/requires.tmp; then
+    (>&2 echo "WARNING: no dependencies will be listed for this distribution!")
+    touch ${workdir}/requires.tmp
+fi
 
 cat ${workdir}/provides.tmp | perl -npe 's/\//::/g; s/\.pm$//;' | sort > ${workdir}/provides
 sort -u ${workdir}/requires.tmp > ${workdir}/requires

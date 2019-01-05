@@ -59,6 +59,7 @@ do_subst_command='do_subst = sed \
 \
   -e '"'"'s,[@]perl5libdir[@],$(perl5libdir),g'"'"' \
   -e '"'"'s,[@]perlrun[@],$(perlrun),g'"'"' \
+  -e '"'"'s,[@]scandeps[@],$(scandeps),g'"'"' \
   -e '"'"'s,[@]perlenv[@],$(perlenv),g'"'"' \
   -e '"'"'s,[@]ksh[@],$(ksh),g'"'"' \
   -e '"'"'s,[@]bashrun[@],$(bashrun),g'"'"' \
@@ -97,7 +98,14 @@ AC_PATH_PROG([PERL_REQUIRES],
 	[perl.req],[],[$PATH$PATH_SEPARATOR/usr/lib/rpm])
 
 if test -z "$PERL_REQUIRES" ; then 
-  AC_MSG_ERROR([perl.req not found?])
+  AC_MSG_WARN([perl.req not found?])
+fi
+
+AC_PATH_PROG([SCANDEPS],
+	[scandeps.pl])
+
+if test -z "$SCANDEPS" ; then 
+  AC_MSG_WARN([scandeps.pl not found?])
 fi
 
 AC_PATH_PROG([POD2MAN],

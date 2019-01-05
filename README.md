@@ -10,15 +10,15 @@ don't bother with the creation of CPAN distributions.
 In order to possibly share some of these modules (or some might say
 inflict them on an unwary public ;-) ) and to use a more modern Perl
 toolchain (`cpanm`) to vendor libraries for use with AWS Lambdas, I've
-recently needed a quick and easy CPAN distribution creation utility.  Hence
-this project.
+recently needed a quick and easy CPAN distribution creation utility.
+Hence this project.
 
 # The Goal
 
 The goal is to take a set of Perl modules and possibly (hopefully)
 tests and _automatically_ create a CPAN distribution.  The _automatic_
 part is key, as I'd like this to simply be the tail end of a CI/CD
-pipeline.
+pipeline for various projects.
 
 To be clear, __this is not a comprehensive CPAN distribution creation
 utility__ and almost certainly will not work for more complex Perl
@@ -37,20 +37,23 @@ _pull requests are welcome too_.
 Well, to be upfront about it, __maybe it's not__. Personally, I like
 to take a bunch of steps I seldom will remember and package them in
 self-contained utilities so that processes can be automated and
-forgotten about. I guess this this approach works for me, but as always YMMV.
+forgotten about. I guess this this approach works for me, but as
+always YMMV. As I mentioned, I'm also using this utility as a
+component of a CI/CD pipeline.
 
-If you are shaking your head and wagging your finger, then count
-yourself among those who have opined that I tend to take something
-simple and make it complicated.  OTOH, most things really are
-complicated if you are patient and perhaps persistent enough to peel
-the onion.  TIMTOWTDI though.
+If after looking at this project you are shaking your head and wagging
+your finger, then count yourself among those who have opined that I
+tend to take something simple and make it complicated.  OTOH, most
+things really are complicated if you are patient and perhaps
+persistent enough to peel the onion.  TIMTOWTDI though.
 
 If your needs are basic and you don't mind manually adding
 dependencies to your `Makefile.PL` then you might find this utility
 overkill at best and completely unnecessary at worst.  I've
 nonetheless found it useful, especially as a way to quickly update the
 dependency list and version numbers for both the Perl modules I am
-packaging and the tests that go along with the distribution.
+packaging and the tests that go along with the distribution.  Did I
+mention I'm using this as part of a CI/CD pipeline?
 
 # Quick Start
 
@@ -60,17 +63,6 @@ _Make sure you have the `autotools` tool chain installed. If you are
 using a RedHat derived Linux distribution, install the `autoconf`
 package using `yum`. If you are using a Debian based system then you
 may have success using `apt` to install the project.
-
-```
-autreconf -i --force
-./configure
-make && make dist
-rpmbuild -tb make-cpan-dist-1.0.0.tar.gz
-```
-
-_You won't be able create a Debian package from this package as it only
-supports creation of an rpm. You should still be able to build and
-install the utility from source on either platform._
 
 ```
 yum install -y autoconf
@@ -111,7 +103,7 @@ CPAN_DIST_MAKER=/usr/local/libexec/make-cpan-dist.pl
 cpan: buildspec.yml
         $(CPAN_DIST_MAKER) -b $<
 
-.PHONEY: cpan
+.PHONY: cpan
 
 clean-local:
         rm -f *.tar.gz
@@ -127,14 +119,44 @@ make cpan
 To use these scripts you'll also need a way to _resolve Perl module
 dependencies_.  The script will use, by default, Red Hat's utility
 that is bundled in its `rpm-build` package (`/usr/lib/rpm/perl.req`).
-If you are running on a Debian based system you can still grab that from the
-`rpm` package apparently.
+I find that this utility does a fairly good job of figuring out the
+direct dependencies.  In fact, it does a much better job than
+`scandeps.pl` or any of the other dependency resolvers you might
+stumble across.
+
+If you are running on a Debian based system you can grab
+`/usr/lib/rpm/perl.req` from the `rpm` package apparently.
 
 If you don't have access to that utility, but have another favorite
 Perl module dependency resolver (don't we all?) then you can use that
 by providing it on the command line (-r) of the bash helper script
-(`make-cpan-dist`). The function should simply provide a list of Perl
-modules one per line and output that to STDOUT.
+(`make-cpan-dist`). The function you specify should simply provide a
+list of Perl modules one per line and output that to STDOUT.
+
+You can also use `scandeps.pl` by specifying the -s option to the
+helper script.
+
+```
+make-cpan-dist -a 'Rob Lauer <rlauer6@comcast.net>' \
+   -m MyFunc -R no -l . -d "my function" \
+   -s
+```
+
+...or try `Devel::Modlist` which will give about the same results as `scandeps.pl`
+
+Create a bash function...`dep_resolver`?...then give it a go.
+
+```
+cat <<eof > dep_resolver
+#!/bin/bash
+
+perl -MDevel::Modlist=nocore \$1.pm 2>&1 | awk '{ print \$1}'
+eof
+chmod +x dep_resolver
+make-cpan-dist -a 'Rob Lauer <rlauer6@comcast.net>' \
+   -m MyFunc -R no -l . -d "my function" \
+   -r dep_resolver
+```
 
 ## What Next?
 
@@ -183,8 +205,8 @@ path.  If your project includes other Perl modules somewhere in the
 Perl module path then they will be packaged as well.  Paths are relative
 to the root of the project or your current working directory if you
 are not specifying a git repository as the source of your
-package. _There is no (current) way to include any other files in the
-distribution._
+package. _There is no (current) way to include other files in the
+distribution (other than Perl modules found in your project)._
 
 So, assuming you have created an appropriate
 `buildspec.yml` file, the easy way boils down to this:
@@ -196,6 +218,39 @@ So, assuming you have created an appropriate
 After executing that statement, you should have a tar ball in your
 current working directory. WooHoo!
 
+#### Advanced Options
+
+The YAML `buildspec.yml` file can contain some additional options to
+control what and how things get packaged.
+
+* use the `recurse` option to add additional Perl modules from your project path.
+
+   If you want to add additional Perl modules to the distribution,
+   just make sure they are under the directory path of your core
+   module and the `recurse` option is set to `yes`.
+   
+   ```
+   path:
+     recurse: yes
+   ```
+
+* to use a different module dependency checker than the default
+  (`/usr/lib/rpm/perl.req`) set the `resolver` option under the
+  `dependencies` section. A value of `scandeps` will use `scandeps.pl`
+  or set the name of a bash script or whatever that will simply output
+  a list of Perl module names.
+
+   ```
+   dependencies:
+     resolver: scandeps
+   ```
+
+* to manually specify the dependency set the `path` option under the
+  `dependencies` section to the path to a file that contains a list of
+  Perl modules. If the name of the file is `cpanfile` then it is
+  assumed it is a `cpanfile` formatted list, otherwise the list should
+  be simple listing of module names.
+  
 ### The Harder Way
 
 A slighly hardwer way is to call the helper bash script directly with

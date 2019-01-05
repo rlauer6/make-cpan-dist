@@ -1,6 +1,6 @@
 #!@perlrun@
 
-# a CPAN distribution utility
+# a CPAN distribution creation utility
 
 use strict;
 use warnings;
@@ -20,25 +20,41 @@ make-cpan-spec.pl
 
 =head1 SYNOPSIS
 
- @libexecdir/make-cpan-spec.pl --module Some::Module --author 'Rob Lauer <rlauer6@comcast.net>' --abstract 'my wonderful module'
+ @libexecdir/make-cpan-spec.pl \
+   --module Some::Module \
+   --author 'Rob Lauer <rlauer6@comcast.net>' \
+   --abstract 'my wonderful module'
 
 =head1 DESCRIPTION
 
-Utility to help create a CPAN distribution.  This utility is typically
-called from the bash helper script of the same name. The helper script
-will also attempt to resolve dependencies using
-F</usr/lib/rpm/perl.req> if it is available or some other supplied
-script that resolves dependencies and outputs a compatible dependency
-list.
+Utility that is part of the toolchain to create a simple CPAN
+distribution.  This utility is typically called from the C<bash> helper
+script of the same name or can be passed a build specfication file in
+YAML format.
 
-In general, for most uses, the bash script is the way to go.
+The helper script (F<make-cpan-dist>) does most of the heavy lifting
+doing things for you like attempting to resolve dependencies, creating
+the F<Makefile.PL> and packaging the distribution as a zip file.
 
-Assuming you have a working directory that might look like this:
+In general you should consider using the C<bash> script or create a
+F<buildspec.yml> file and invoke this utility with the C<-b> option
+described below rather than calling this script directly.
+
+=head2 Using the Bash Script
+
+Assuming you have a module named C<Foo::Bar> in a directory named
+F<lib> and some tests in a directory named F<t>, you might try:
 
  make-cpan-dist -l lib -t t -m Foo::Bar \
   -a 'Rob Lauer <rlauer6@comcast.net>' -d 'the Foo::Bar module!'
 
-...might do the trick for you.
+=head2 Using F<buildspec.yml>
+
+ make-cpan-dist.pl -b buildspec.yml
+
+Calling this utility directly with the C<-b> option will invoke the
+C<bash> script and is probably the preferred way of using this tool
+chain. If you insist on using this utility directly anyway, read on.
 
 =head1 OPTIONS
 
@@ -51,7 +67,7 @@ Name of the module
 =item -b, --buildspec
 
 Name of a build specification file.  The build specification file is
-used instead of options and should be a YAML file that looks something
+used B<instead> of options and should be a YAML file that looks something
 like this:
 
   project:
@@ -61,9 +77,123 @@ like this:
       name: Rob Lauer
       mailto: rlauer6@comcast.net
   pm_module: Amazon::Credentials
+  dependencies:
+    resolver: scandeps
   path:
     pm_module: src/main/perl/lib
     tests: %src/main/perl/t
+
+The sections are described below:
+
+=over 10
+
+=item project
+
+=over 15
+
+=item git
+
+The path to the C<git> project. When the project is cloned, the
+utility will look for F<configure.ac> and if found will attempt to
+build the project in usual I<autoconfiscated> manner:
+
+ git clone {project}
+ autoconf -i --force
+ ./configure
+ make
+
+...other wise the project will simply be cloned and it will be assumed
+the Perl module is somewhere to be found in the project tree.  You
+should make sure that you set the C<path> section accordingly so that
+the utiliy now knows were to find your Perl module though.
+
+=item description
+
+The description of the module as it will be appear in the CPAN repository.
+
+=item author
+
+The I<author> section should contain a name and email address.
+
+=over 20
+
+=item name
+
+The author's name.
+
+=item mailto
+
+The author's email address.
+
+=back
+
+=back
+
+=item pm_module
+
+The name of the Perl module.
+
+=item dependencies (optional)
+
+The I<dependencies> section, if present may contain the fully
+qualified path name to a file that contains a list of dependencies. If
+the name of the file is F<cpanfile>, then the file is assumed to be in
+I<cpanfile> format, otherwise the file should be a simple list of Perl
+module names.
+
+By default, the scripts will use F</usr/lib/rpm/perl.req> as the
+depdency resolver, however you can override this by specifying the
+name of program that will produce a list of modules.  If you specify
+the special name I<scandeps>, the scripts will use F<scandeps.pl>.
+
+=over 15
+
+=item path (optional)
+
+Fully qualified path to a dependency list.
+
+=item resolver (optional)
+
+Name of a program that will provide a list of depenencies when passed
+a module name.
+
+=back
+
+=item path (optional)
+
+=over 15
+
+=item pm_module
+
+The path where the Perl module to be packaged can be found.  By
+default, the current working directory will be searched.
+
+=item tests (optional)
+
+The path were tests to be specified in the F<Makefile.PL> will be found.
+
+=back
+
+=item provides (optional)
+
+By default the package will provide the module to be packaged and any
+files included that were found if the C<recurse> option was specified.
+
+=item extra (optional)
+
+Name of a file that contains a list of files to be included in package.
+
+=item extra-files (optional)
+
+List of files to be included in package.
+
+Example:
+
+ extra-files:
+   - ChangeLog
+   - README
+
+=back
 
 =item -a, --author
 
@@ -101,11 +231,18 @@ current working directory.
 
 =head1 DEPENDENCIES
 
-By default dependencies should be listed in files named F<requires>
-and F<test-requires>.  You can specify a different name for the files
-with the C<-r> and C<-t> options. The F<requires> file is
-mandatory. If you use the bash script that invokes this utility it
-will create these files for you.  Modules should be listed as:
+By default the script will look for dependencies in files named
+F<requires> and F<test-requires>.  These are typically created by the
+C<bash> script so you don't need to both with this piece of
+information unless you are directly using this script.
+
+You can specify a different name for the files with the C<-r> and
+C<-t> options. You must however have a filed that contains the
+dependency list. Again, if you use the C<bash> script that invokes
+this utility or are calling this utility with a F<buildspec.yml> file,
+these files will be automatically created for you based on your
+options.  If you provide your own F<requires> or F<test-requires>
+file, modules should be listed as:
 
   module-name, version
 
@@ -119,7 +256,6 @@ Example:
 Rob Lauer - <rlauer6@comcast.net>
 
 =cut
-
 
 sub get_requires {
   my $requires = shift;
@@ -178,8 +314,7 @@ Typically, this script is called from the bash helper script of the same
 name (make-cpan-dist) or is invoked with a YAML file that specifies
 the parmeters used to build a distribution.
 
-See https://github.com/rlauer6/perl-Amazon-Credentials for complete
-documentation.
+See https://github.com/rlauer6/make-cpan-dist.git for more documentation.
 
 See man make-cpan-dist
 
@@ -260,7 +395,31 @@ if ( $options{buildspec} ) {
       if $buildspec->{project}->{git};
   }
 
+  # dependencies:
+  #   resolver:
+  #   path:
+  if ( $buildspec->{dependencies} ) {
+    if ( $buildspec->{dependencies}->{path} ) {
+      $args{D} = $buildspec->{dependencies}->{path};
+    }
+    
+    if ( $buildspec->{dependencies}->{resolver} ) {
+      $args{r} = $buildspec->{dependencies}->{resolvers};
+    }
+    
+    if ( $args{D} && $args{r} ) {
+      die "use either path or resolver for dependencies, but not both\n";
+    }
+  }
+  
   if ( $buildspec->{path} ) {
+    if ( $buildspec->{path}->{recurse} && $buildspec->{path}->{recurse} =~/(yes|no)/ ) {
+      $args{R} = $buildspec->{path}->{recurse};
+    }
+    elsif ($buildspec->{path}->{recurse}) {
+      die "use only yes or no for 'recurse' option\n";
+    }
+    
     # -l
     $args{l}= $buildspec->{path}->{pm_module}
       if $buildspec->{path}->{pm_module};
@@ -283,8 +442,9 @@ if ( $options{buildspec} ) {
 
   $args{'-x'} = ''
     if ! $options{'cleanup'};
-  
-  if ($buildspec->{extra}) {
+
+  # filename specified 
+  if ( $buildspec->{extra} ) {
     $args{'-f'} = $buildspec->{extra};
   }
 
@@ -342,7 +502,8 @@ $options{'test-requires'} = $options{'test-requires'} || 'test-requires';
 
 my $pre_req =  Dumper get_requires($options{requires});
 $pre_req =~s/^\s*(.*?)$/$1/m;
-
+    chomp $pre_req;
+    
 my $test_req = {};
 
 if ( $options{'test-requires'} && -s $options{'test-requires'} ) {

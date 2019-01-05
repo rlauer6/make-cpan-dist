@@ -3,6 +3,7 @@ SUBDIRS = .
 perlrun = @ENV@ perl
 bashrun = @BASHRUN@
 perlenv = @ENV@ perl
+scandeps = @SCANDEPS@
 
 BASHSCRIPTS = make-cpan-dist.in
 

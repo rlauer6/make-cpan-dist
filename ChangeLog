@@ -1,3 +1,26 @@
+Sat Jan  5 08:28:09 2019  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.1.1]: support for -D -s, -R
+
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- support for -R (recurse)
+	- support for -D (dependencies)
+	- support for -r (resolver)
+	- remove trailing newline from PREREQ_PM
+	- more pod on buidspec.yml
+	* src/main/bash/bin/make-cpan-dist.in
+	- added -D option (dependencies)
+	- added -s option (scandeps)
+	- only autoconf if configure.ac
+	- default provides is module name
+	- implent use of dependency file, scandeps.pl or custom resolver
+	* src/main/bash/bin/Makefile.am
+	- @SCANDEPS@
+	* configure.ac
+	- likewise
+	- warn if perl.req not found
+	* README.md: more docs
+
 Mon Dec 17 09:28:00 2018  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.1.0]: support for -f, -P, -R
