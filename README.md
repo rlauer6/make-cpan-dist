@@ -16,7 +16,7 @@ Hence this project.
 After installing the project you'll find more information by reading the man page.
 
 ```
-man cpan-dist
+man make-cpan-dist
 ```
 
 # The Goal
@@ -291,7 +291,7 @@ Options
 -R yes/no      - recurse directories for files to package (default: yes)
 -t path        - path to test files
 -v             - more verbose output
--x do not cleanup files
+-x             - fgdo not cleanup files
 
 NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables.
 ```
