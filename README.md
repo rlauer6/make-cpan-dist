@@ -13,6 +13,12 @@ toolchain (`cpanm`) to vendor libraries for use with AWS Lambdas, I've
 recently needed a quick and easy CPAN distribution creation utility.
 Hence this project.
 
+After installing the project you'll find more information by reading the man page.
+
+```
+man cpan-dist
+```
+
 # The Goal
 
 The goal is to take a set of Perl modules and possibly (hopefully)
@@ -59,7 +65,7 @@ mention I'm using this as part of a CI/CD pipeline?
 
 ## Installation
 
-Make sure you have the `autotools` tool chain installed. If you are
+Make sure you have the `autotools` toolchain installed. If you are
 using a RedHat derived Linux distribution, install the `autoconf`
 package using `yum`. If you are using a Debian based system then you
 may have success using `apt` to install the necessary dependencies.
@@ -86,7 +92,7 @@ Before we go any further, I'll bet I need to answer that question.  So, in no pa
 
 * Habit
 * Automation malleability
-* Familiarity with the tool chain
+* Familiarity with the toolchain
 * Standardization of my development process
 * Flexibility to add more automation with `make` as a project organically matures
 * Ubiquity of the toolchain
@@ -213,8 +219,7 @@ path.  If your project includes other Perl modules somewhere in the
 Perl module path then they will be packaged as well.  Paths are relative
 to the root of the project or your current working directory if you
 are not specifying a git repository as the source of your
-package. _There is no (current) way to include other files in the
-distribution (other than Perl modules found in your project)._
+package.
 
 So, assuming you have created an appropriate
 `buildspec.yml` file, the easy way boils down to this:
@@ -245,7 +250,7 @@ control what and how things get packaged.
 * to use a different module dependency checker than the default
   (`/usr/lib/rpm/perl.req`) set the `resolver` option under the
   `dependencies` section. A value of `scandeps` will use `scandeps.pl`
-  or set the name of a bash script or whatever that will simply output
+  or set the name of an executable that will simply output
   a list of Perl module names.
 
    ```
@@ -253,15 +258,15 @@ control what and how things get packaged.
      resolver: scandeps
    ```
 
-* to manually specify the dependency set the `path` option under the
+* to manually specify a list of dependencies, set the `path` option under the
   `dependencies` section to the path to a file that contains a list of
   Perl modules. If the name of the file is `cpanfile` then it is
-  assumed it is a `cpanfile` formatted list, otherwise the list should
-  be simple listing of module names.
+  assumed to be a `cpanfile` formatted list, otherwise the list should
+  be a simple listing of module names.
   
 ### The Harder Way
 
-A slighly hardwer way is to call the helper bash script directly with
+A slighly harder way is to call the helper bash script directly with
 specific options to create the distribution.
 
 ```
@@ -271,16 +276,21 @@ Utility to create a CPAN distribution
 
 Options
 -------
--a author
--d description
--h help
--l path to Perl modules
--m module name
--o output directory (default: current directory)
--p preserve Makefile.PL
--r function to list dependencies
--t path to test files
--v more verbose output
+-a author      - author (ex: Anonymouse <anonymouse@example.org>)
+-d description - description to be included CPAN
+-D file        - use file as the dependency list
+-h             - help
+-f file        - file containing a list of extra files to include
+-l path        - path to Perl modules
+-m name        - module name
+-o dir         - output directory (default: current directory)
+-p             - preserve Makefile.PL
+-P file        - file that contains a list of modules to be packaged
+-r pgm         - script or program to list dependencies
+-s             - use scandeps.pl to find dependncies
+-R yes/no      - recurse directories for files to package (default: yes)
+-t path        - path to test files
+-v             - more verbose output
 -x do not cleanup files
 
 NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables.

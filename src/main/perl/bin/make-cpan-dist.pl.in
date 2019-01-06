@@ -20,7 +20,7 @@ make-cpan-spec.pl
 
 =head1 SYNOPSIS
 
- @libexecdir/make-cpan-spec.pl \
+ @libexecdir@/make-cpan-spec.pl \
    --module Some::Module \
    --author 'Rob Lauer <rlauer6@comcast.net>' \
    --abstract 'my wonderful module'
@@ -33,8 +33,8 @@ script of the same name or can be passed a build specfication file in
 YAML format.
 
 The helper script (F<make-cpan-dist>) does most of the heavy lifting
-doing things for you like attempting to resolve dependencies, creating
-the F<Makefile.PL> and packaging the distribution as a zip file.
+doing things for you like attempting to resolve dependencies and
+packaging the distribution as a tarball.
 
 In general you should consider using the C<bash> script or create a
 F<buildspec.yml> file and invoke this utility with the C<-b> option
@@ -53,8 +53,7 @@ F<lib> and some tests in a directory named F<t>, you might try:
  make-cpan-dist.pl -b buildspec.yml
 
 Calling this utility directly with the C<-b> option will invoke the
-C<bash> script and is probably the preferred way of using this tool
-chain. If you insist on using this utility directly anyway, read on.
+C<bash> script and is probably the preferred way of using this toolchain. If you insist on using this utility directly anyway, read on.
 
 =head1 OPTIONS
 
@@ -102,10 +101,10 @@ build the project in usual I<autoconfiscated> manner:
  ./configure
  make
 
-...other wise the project will simply be cloned and it will be assumed
+...otherwise the project will simply be cloned and it will be assumed
 the Perl module is somewhere to be found in the project tree.  You
 should make sure that you set the C<path> section accordingly so that
-the utiliy now knows were to find your Perl module though.
+the utility now knows were to find your Perl module though.
 
 =item description
 
@@ -142,7 +141,7 @@ I<cpanfile> format, otherwise the file should be a simple list of Perl
 module names.
 
 By default, the scripts will use F</usr/lib/rpm/perl.req> as the
-depdency resolver, however you can override this by specifying the
+dependency resolver, however you can override this by specifying the
 name of program that will produce a list of modules.  If you specify
 the special name I<scandeps>, the scripts will use F<scandeps.pl>.
 
@@ -170,7 +169,7 @@ default, the current working directory will be searched.
 
 =item tests (optional)
 
-The path were tests to be specified in the F<Makefile.PL> will be found.
+The path where tests to be specified in the F<Makefile.PL> will be found.
 
 =back
 
@@ -181,7 +180,7 @@ files included that were found if the C<recurse> option was specified.
 
 =item extra (optional)
 
-Name of a file that contains a list of files to be included in package.
+Name of a file that contains a list of files to be included in the package.
 
 =item extra-files (optional)
 
@@ -233,8 +232,8 @@ current working directory.
 
 By default the script will look for dependencies in files named
 F<requires> and F<test-requires>.  These are typically created by the
-C<bash> script so you don't need to both with this piece of
-information unless you are directly using this script.
+C<bash> script and the files are transparent to you during the
+creation of the distribution.
 
 You can specify a different name for the files with the C<-r> and
 C<-t> options. You must however have a filed that contains the

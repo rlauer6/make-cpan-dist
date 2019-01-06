@@ -62,7 +62,7 @@ function usage {
     echo "-R yes/no      - recurse directories for files to package (default: yes)"
     echo "-t path        - path to test files"
     echo "-v             - more verbose output"
-    echo "-x do not cleanup files"
+    echo "-x             - do not cleanup files"
     echo ""
     echo "NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables."
     
