@@ -253,7 +253,8 @@ fi
 if test -n "$EXTRA"; then
     if test -s "$EXTRA"; then
         for a in $(cat $EXTRA); do
-            cp $a $builddir
+            test -d $(dirname $a) || mkdir -p $(dirname $a)
+            cp $a $builddir/$a
         done
     else
         echo "No EXTRA file ($EXTRA) found in $(pwd)!"
@@ -263,7 +264,7 @@ fi
 workdir=$(pwd)
 package_files=$(mktemp);
 
-if test "$recurse_directories" = "yes"; then
+if [ "$recurse_directories" = "yes" ]; then
     find ${PROJECT_HOME}/${perl5libdir} -name '*.pm' > $package_files;
 else
     if test -n "$provides"; then

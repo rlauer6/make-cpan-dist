@@ -9,6 +9,7 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Temp qw/:POSIX/;
 use YAML::Syck;
+use Scalar::Util qw/reftype/;
 
 our $VERSION = '@PACKAGE_VERSION@';
 
@@ -447,12 +448,11 @@ if ( $options{buildspec} ) {
     $args{'-f'} = $buildspec->{extra};
   }
 
-  if ( $buildspec->{'extra-files'} ) {
+  if ( $buildspec->{'extra-files'} && reftype($buildspec->{'extra-files'}) eq 'ARRAY' ) {
     my $extra_files = $buildspec->{extra} || 'extra-files';
     
     open (my $fh, ">>$extra_files") or
       die "could not append to $extra_files\n";
-    
     
     foreach (@{$buildspec->{'extra-files'}}) {
       print $fh "$_\n";
@@ -472,7 +472,7 @@ if ( $options{buildspec} ) {
     close $fh;
     $args{'-P'} = "provides";
   }
-  
+
   exec '@bindir@/make-cpan-dist ' . join(" ", %args);
 }
 

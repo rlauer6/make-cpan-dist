@@ -1,3 +1,12 @@
+Tue Jan 29 09:27:20 2019  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.1.2]:
+	* configure.ac: bump minor version
+	* src/main/bash/bin/make-cpan-dist.in
+	- make sure target directory for extra file exists
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- check that extra-files is an array
+
 Sat Jan  5 08:28:09 2019  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.1.1]: support for -D -s, -R
