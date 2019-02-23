@@ -1,4 +1,4 @@
-AC_INIT([make-cpan-dist], [1.2.0], [rlauer6@comcast.net])
+AC_INIT([make-cpan-dist], [1.2.1], [rlauer6@comcast.net])
 
 __poor_mans_expand_file_name () {
     _tmp_name=$1

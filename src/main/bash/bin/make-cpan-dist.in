@@ -303,7 +303,7 @@ if test -n "$EXTRA"; then
     if test -s "$EXTRA"; then
         for a in $(cat $EXTRA); do
             test -d $(dirname $a) || mkdir -p $(dirname $a)
-            cp $a $builddir/$a
+            cp $a $builddir
         done
     else
         echo "No EXTRA file ($EXTRA) found in $(pwd)!"

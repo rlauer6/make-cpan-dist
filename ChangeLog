@@ -1,3 +1,11 @@
+Sat Feb 23 16:33:01 2019  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.2.1]: extra-files
+	* src/main/bash/bin/make-cpan-dist.in
+	- cp file to root of build direct, not path
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- modify path of extra-files to bin/
+
 Sat Feb 23 13:44:25 2019  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.2.0]: support for -e, -z, -b

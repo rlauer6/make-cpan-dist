@@ -538,6 +538,7 @@ if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
   open (my $fh, '<' . $options{'exe-files'}) or die "could not open " . $options{'exe-files'} . "\n";
   while (<$fh>) {
     chomp;
+    s/^.*\/(.*)$/bin\/$1/;
     push @exe_file_list, $_;
   };
   close $fh;
