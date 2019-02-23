@@ -1,6 +1,44 @@
 #!@bashrun@
 # -*- mode: sh; -*-
 
+function usage {
+    test -n "$1" && echo "error: $1";
+    
+    cat <<EOT
+usage: make-cpan-dist Options
+
+Utility to create a CPAN distribution. See 'man make-cpan-dist'
+
+Options
+-------
+-a author      - author (ex: Anonymouse <anonymouse@example.org>)
+-b buildspec   - use a buildspec file instead of options
+-d description - description to be included CPAN
+-D file        - use file as the dependency list
+-e path        - path for extra .pl files to package
+-h             - help
+-f file        - file containing a list of extra files to include
+-l path        - path to Perl modules
+-m name        - module name
+-o dir         - output directory (default: current directory)
+-p             - preserve Makefile.PL
+-P file        - file that contains a list of modules to be packaged
+-r pgm         - script or program to list dependencies
+-s             - use scandeps.pl to find dependncies
+-R yes/no      - recurse directories for files to package (default: yes)
+-t path        - path to test files
+-v             - more verbose output
+-x             - do not cleanup files
+
+NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables.
+
+Copyright (c) 2019 Robert C. Lauer, All rights reserved.
+This is free software and may be used for any purpose without charge.
+EOT
+    
+    exit;
+}
+
 # look for project home directory from here back, sets PROJECT_HOME
 function find_git_home {
     project_home="..";
@@ -29,6 +67,7 @@ function cleanup {
     test -n "$testsfile" && rm "$testsfile"
     test -n "$tmp_gitdir" && rm -rf "$tmp_gitdir"
     test -n "$package_files" && rm "$package_files"
+    test -n "$exe_files" && rm "$exe_files"
     
     if test -n "$workdir"; then
         for a in requires test-requires provides; do
@@ -37,36 +76,6 @@ function cleanup {
     fi
 
     test -n "$builddir" && rm -rf "$builddir"
-}
-
-function usage {
-    test -n "$1" && echo "error: $1";
-    echo "usage: make-cpan-dist Options"
-    echo ""
-    echo "Utility to create a CPAN distribution"
-    echo ""
-    echo "Options"
-    echo "-------"
-    echo "-a author      - author (ex: Anonymouse <anonymouse@example.org>)"
-    echo "-d description - description to be included CPAN"
-    echo "-D file        - use file as the dependency list"
-    echo "-h             - help"
-    echo "-f file        - file containing a list of extra files to include"
-    echo "-l path        - path to Perl modules"
-    echo "-m name        - module name"
-    echo "-o dir         - output directory (default: current directory)"
-    echo "-p             - preserve Makefile.PL"
-    echo "-P file        - file that contains a list of modules to be packaged"
-    echo "-r pgm         - script or program to list dependencies"
-    echo "-s             - use scandeps.pl to find dependncies"
-    echo "-R yes/no      - recurse directories for files to package (default: yes)"
-    echo "-t path        - path to test files"
-    echo "-v             - more verbose output"
-    echo "-x             - do not cleanup files"
-    echo ""
-    echo "NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables."
-    
-    exit;
 }
 
 # default dependency finder
@@ -96,11 +105,30 @@ function get_module_versions {
     done
 }
 
+function scan() {
+    scan_target="$1";
+    
+    if [ "$PERL_REQUIRES" = "SCANDEPS" ]; then
+        if test -z "@scandeps@"; then
+            echo "no scandeps.pl found!"
+            exit 1
+        else
+            set -o pipefail
+            if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" >>${workdir}/requires.tmp; then
+                echo "ERROR: could not resolve dependencies for $scan_target"
+                exit 1;
+            fi
+        fi
+    else
+        $PERL_REQUIRES $scan_target >> ${workdir}/requires.tmp
+    fi
+}
+
 # +--------------------+
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-OPTS=$(getopt -o D:sphg:t:a:m:d:r:l:o:vxf:R:P: -- "$@")
+OPTS=$(getopt -o b:D:e:sphg:t:a:m:d:r:l:o:vxf:R:P:z -- "$@")
 
 if [ $? -ne 0 ]; then
     echo "could not parse options"
@@ -113,6 +141,21 @@ set -e
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        -e)
+            perl5bindir="$2";
+            shift;
+            shift;
+            ;;
+        
+        -z)
+            DRYRUN="--dryrun";
+            shift;
+            ;;
+        
+        -b) BUILDSPEC="$2";
+            shift;
+            shift;
+            ;;
         -D)
             dependency_file="$2";
             shift;
@@ -205,6 +248,12 @@ done
 
 shift;
 
+if test -n "$BUILDSPEC"; then
+    PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
+                -b $BUILDSPEC $DRYRUN
+    exit $?;
+fi
+
 test -z "$module" && usage "no module specified";
 test -z "$author" && usage "no author specified";
 test -z "$description" && usage "no description";
@@ -263,9 +312,16 @@ fi
 
 workdir=$(pwd)
 package_files=$(mktemp);
+exe_files=$(mktemp);
+
+if test -n "$perl5bindir"; then
+    find ${PROJECT_HOME}/${perl5bindir} -name '*.pl' > $exe_files;
+    find ${PROJECT_HOME}/${perl5bindir} -name '*.sh' >> $exe_files;
+fi
 
 if [ "$recurse_directories" = "yes" ]; then
     find ${PROJECT_HOME}/${perl5libdir} -name '*.pm' > $package_files;
+    
 else
     if test -n "$provides"; then
         if test -s "$provides"; then
@@ -287,22 +343,18 @@ if test -z "$dependency_file"; then
         echo $required_module >> ${workdir}/provides.tmp
         mkdir -p $(dirname ${builddir}/lib/$required_module)
         cp $a ${builddir}/lib/$required_module
-        
-        if [ "$PERL_REQUIRES" = "SCANDEPS" ]; then
-            if test -z "@scandeps@"; then
-                echo "no scandeps.pl found!"
-                exit 1
-            else
-                set -o pipefail
-                if ! @scandeps@ -Rc $a | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" >>${workdir}/requires.tmp; then
-                    echo "ERROR: could not resolve dependencies for $a"
-                    exit 1;
-                fi
-            fi
-        else
-            $PERL_REQUIRES $a >> ${workdir}/requires.tmp
-        fi
+        scan $a;
     done
+    
+    # find dependencies for .pl files
+    if test -s "$exe_files"; then
+        mkdir -p ${builddir}/bin
+        
+        for a in $(cat $exe_files); do
+            cp $a ${builddir}/bin
+            scan $a;
+        done
+    fi
 else
     if [ $(basename $dependency_file) = "cpanfile" ]; then
         if test -n $(which cpanfile-dump 2>/dev/null); then
@@ -359,6 +411,7 @@ test -n "$VERBOSE" && test -e ${workdir}/test-requires && cat ${workdir}/test-re
 # create the Makefile.PL
 PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             -r ${workdir}/requires \
+            -e $exe_files \
             -t ${workdir}/test-requires \
             -m "$module" \
             -d "$description" \
@@ -373,14 +426,12 @@ else
     test -n "$VERBOSE" && tree
     test -n "$VERBOSE" && cat Makefile.PL
     
-    echo "destdir: $destdir"
-    
     if perl Makefile.PL; then
-        test -n "$PRESERVE_MAKEFILE" && cp Makefile.PL $destdir
         make manifest
         make dist
         cp *.tar.gz $destdir
         make test
-        echo "try cpan-upload-http $(ls -1rt *.tar.gz | tail -1)"
+        test -n "$PRESERVE_MAKEFILE" && cp Makefile.PL $destdir
+        echo "CPAN authors: cpan-upload-http $(ls -1rt *.tar.gz | tail -1)"
     fi
 fi

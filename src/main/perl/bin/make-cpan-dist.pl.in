@@ -6,8 +6,9 @@ use strict;
 use warnings;
 
 use Data::Dumper;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case );
 use File::Temp qw/:POSIX/;
+
 use YAML::Syck;
 use Scalar::Util qw/reftype/;
 
@@ -202,7 +203,7 @@ address in angle brackets as shown in the example.
 
 Example: -a 'Rob Lauer <rlauer6@comcast.net>'
 
-=item -d, --abstract
+=item -A, --abstract
 
 Short description of the module purpose.
 
@@ -324,16 +325,18 @@ eot
 my %options = (cleanup => 1 );
 
 GetOptions(\%options,
-           "module=s",
-           "abstract|d=s",
+           "abstract|A=s",
            "author|a=s",
-           "requires=s",
-           "test-requires=s",
-           "version=s",
-           "verbose|V",
            "buildspec=s",
            "cleanup!",
-           "help=s"
+           "dryrun",
+           "exe-files=s",
+           "help=s",
+           "module=s",
+           "requires=s",
+           "test-requires=s",
+           "verbose|V",
+           "version=s"
           );
 
 if ( $options{version} ) {
@@ -403,15 +406,21 @@ if ( $options{buildspec} ) {
       $args{D} = $buildspec->{dependencies}->{path};
     }
     
-    if ( $buildspec->{dependencies}->{resolver} ) {
-      $args{r} = $buildspec->{dependencies}->{resolvers};
+    if ( my $resolver = $buildspec->{dependencies}->{resolver} ) {
+      if ( $resolver eq 'scandeps' ) {
+        $args{s} = '';
+      }
+      else {
+        $args{r} = $buildspec->{dependencies}->{resolver};
+      }
     }
     
     if ( $args{D} && $args{r} ) {
       die "use either path or resolver for dependencies, but not both\n";
     }
   }
-  
+
+  # the default if not provided in the bash script is always YES!
   if ( $buildspec->{path} ) {
     if ( $buildspec->{path}->{recurse} && $buildspec->{path}->{recurse} =~/(yes|no)/ ) {
       $args{R} = $buildspec->{path}->{recurse};
@@ -423,6 +432,10 @@ if ( $options{buildspec} ) {
     # -l
     $args{l}= $buildspec->{path}->{pm_module}
       if $buildspec->{path}->{pm_module};
+
+    # -e
+    $args{e}= $buildspec->{path}->{exe_files}
+      if $buildspec->{path}->{exe_files};
     
     # -t
     $args{t}= $buildspec->{path}->{tests}
@@ -472,8 +485,14 @@ if ( $options{buildspec} ) {
     close $fh;
     $args{'-P'} = "provides";
   }
-
-  exec '@bindir@/make-cpan-dist ' . join(" ", %args);
+  
+  unless ( $options{dryrun} ) {
+    exec '@bindir@/make-cpan-dist ' . join(" ", %args);
+  }
+  else {
+    print  '@bindir@/make-cpan-dist ' . join(" ", %args) . "\n";
+    exit 0;
+  }
 }
 
 my $module=$options{module};
@@ -510,8 +529,21 @@ if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
   $test_req =~s/^\s*(.*?)$/$1/m;
 }
 else {
-  $test_req = Dumper {};
+  $test_req = Dumper $test_req;
 }
+
+my @exe_file_list;
+
+if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
+  open (my $fh, '<' . $options{'exe-files'}) or die "could not open " . $options{'exe-files'} . "\n";
+  while (<$fh>) {
+    chomp;
+    push @exe_file_list, $_;
+  };
+  close $fh;
+}
+
+my $exe_files = Dumper \@exe_file_list;
 
 print <<eot;
 
@@ -526,6 +558,7 @@ WriteMakefile(
     ABSTRACT       => '$abstract',
     LICENSE        => 'perl',
     PL_FILES       => {},
+    EXE_FILES      => $exe_files,
     PREREQ_PM      => $pre_req,
     TEST_REQUIRES  => $test_req
 );

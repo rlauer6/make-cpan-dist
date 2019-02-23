@@ -3,7 +3,7 @@
 This project is yet another attempt to create a repeatable, __easy to
 use__ script for creating CPAN distributions.
 
-Typically, because I use the Redhat Package Manager to create Perl
+Typically, because I may use the Redhat Package Manager to create Perl
 modules that can be installed as part of my application stacks, I
 don't bother with the creation of CPAN distributions.
 
@@ -156,7 +156,13 @@ make-cpan-dist -a 'Rob Lauer <rlauer6@comcast.net>' \
    -s
 ```
 
-...or try `Devel::Modlist` which will give about the same results as `scandeps.pl`
+...or try:
+
+* `Devel::Modlist`
+* `Perl::PrereqScanner`
+
+...all of which will give about the same results as `scandeps.pl`
+
 
 Create a bash function...`dep_resolver`?...then give it a go.
 
@@ -206,6 +212,7 @@ pm_module: Amazon::Credentials
 path:
   pm_module: src/main/perl/lib
   tests: src/main/perl/t
+  exe_files: src/main/perl/bin
 ```
 
 You specify some project metadata and possibly a pointer to the
@@ -215,11 +222,18 @@ project in a git repository that can be cloned.  You must provide the
 The `path` attributes specify the path to the module and the path to
 the tests which will be packaged. All files with an extension of `.t`
 are assumed to be included in the package if you have specified a test
-path.  If your project includes other Perl modules somewhere in the
+path.
+
+If your project includes other Perl modules somewhere in the
 Perl module path then they will be packaged as well.  Paths are relative
 to the root of the project or your current working directory if you
 are not specifying a git repository as the source of your
 package.
+
+If youru project includes perl scripts, you can add those to your
+distribution by setting the path to those with the `exe_files`
+subsection of `path`.  These will be packaged and installed in the
+`bin` directory (INSTALLBIN).
 
 So, assuming you have created an appropriate
 `buildspec.yml` file, the easy way boils down to this:
@@ -240,8 +254,9 @@ control what and how things get packaged.
 
    If you want to add additional Perl modules to the distribution,
    just make sure they are under the directory path of your core
-   module and the `recurse` option is set to `yes`.
-   
+   module and the `recurse` option is set to `yes`. _Actually this is
+   the default.  If you don't want to recurse, set this to *no*._
+
    ```
    path:
      recurse: yes
@@ -253,10 +268,10 @@ control what and how things get packaged.
   or set the name of an executable that will simply output
   a list of Perl module names.
 
-   ```
-   dependencies:
-     resolver: scandeps
-   ```
+  ```
+  dependencies:
+    resolver: scandeps
+  ```
 
 * to manually specify a list of dependencies, set the `path` option under the
   `dependencies` section to the path to a file that contains a list of
@@ -272,13 +287,15 @@ specific options to create the distribution.
 ```
 usage: make-cpan-dist Options
 
-Utility to create a CPAN distribution
+Utility to create a CPAN distribution. See 'man make-cpan-dist'
 
 Options
 -------
 -a author      - author (ex: Anonymouse <anonymouse@example.org>)
+-b buildspec   - use a buildspec file instead of options
 -d description - description to be included CPAN
 -D file        - use file as the dependency list
+-e path        - path for extra .pl files to package
 -h             - help
 -f file        - file containing a list of extra files to include
 -l path        - path to Perl modules
@@ -291,9 +308,12 @@ Options
 -R yes/no      - recurse directories for files to package (default: yes)
 -t path        - path to test files
 -v             - more verbose output
--x             - fgdo not cleanup files
+-x             - do not cleanup files
 
 NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables.
+
+Copyright (c) 2019 Robert C. Lauer, All rights reserved.
+This is free software and may be used for any purpose without charge.
 ```
 
 Example:
@@ -322,10 +342,11 @@ So far, neither of these methods is particularly hard and can be used
 interchangeably as part of you deployment pipeline.  The key to the
 "easiness" part, at least for me, is the fact that the bash script
 will try to resolve dependencies using the helper from the `rpm-build`
-project (`/usr/lib/rpm/perl.req`) and find the Perl module version for
-each of those dependencies.  The __dependency resolver is not
-perfect__, specifically it may get tripped up on some ways your clever
-Perl module utilizes other resources.  In general though, _it's good
+project (`/usr/lib/rpm/perl.req` or the dependency checker you
+specify) and find the Perl module version for each of those
+dependencies.  The __dependency resolver is not perfect__,
+specifically it may get tripped up on some ways your clever Perl
+module utilizes other resources.  In general though, _it's good
 enough_, however you can always ask the script to preserve (-p) the
 `Makefile.PL` that is generated and start tweaking that yourself. You
 could also open an issue and I'll try to tackle it. You could also
@@ -365,6 +386,7 @@ list.
    1. get the version number of each module
    1. save the module and version number to the dependency file
 1. repeat for each test (*.t) in the test directory
+1. repeat for the each script in your script directory (exe_files).
 
 The result of the above operation is the two files (`requires`,
 `test-requires`) you'll need to provide to the script.  The contents
@@ -374,8 +396,11 @@ of the files are then used to populate the template for the
 
 # Finally
 
-I hope you find this useful. If I can make it more useful, let me know.
+I hope you find this useful. If I can make it more useful, let me
+know. Oh, if you find yourself scratching your head and wondering if
+indeed the bash script calls the perl script and vice versa, you are
+correct.
 
 # Author
 
-Rob Lauer  <rlauer6@comcast.net>
+Rob Lauer <rlauer6@comcast.net>

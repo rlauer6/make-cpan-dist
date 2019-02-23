@@ -1,3 +1,21 @@
+Sat Feb 23 13:44:25 2019  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.2.0]: support for -e, -z, -b
+	* src/main/bash/bin/make-cpan-dist.in
+	- added -e for exe-files support
+	- added -z dryrun option
+	- added -b buildspec option
+	(scan): new from scandeps section
+	* c/main/perl/bin/make-cpan-dist.pl.in
+	- no_ignore_case for options
+	- -A instead of -d for abstract (description in yaml file)
+	- exe-files option
+	- resolver, not resolvers
+	- set scandeps arg -s if resolver is 'scandeps'
+	- dryrun option
+	* configure.ac: bump
+	* README: updates for above
+
 Tue Jan 29 09:27:20 2019  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.1.2]:
