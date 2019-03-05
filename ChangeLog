@@ -1,3 +1,15 @@
+Tue Mar  5 15:09:25 2019  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.3.0]: any version
+	* configure.ac: bump
+	* src/main/bash/bin/make-cpan-dist.in
+	- support for -A "any version will do" option
+	- output requires list if DEBUG
+	- apply recurse option to scripts too
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- disambiguate -v
+	- support include-version option in buildspec (any version)
+	
 Sat Feb 23 16:33:01 2019  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.2.1]: extra-files

@@ -12,6 +12,7 @@ Utility to create a CPAN distribution. See 'man make-cpan-dist'
 Options
 -------
 -a author      - author (ex: Anonymouse <anonymouse@example.org>)
+-A any version - do not include version numbers for required modules
 -b buildspec   - use a buildspec file instead of options
 -d description - description to be included CPAN
 -D file        - use file as the dependency list
@@ -99,7 +100,9 @@ function get_module_versions {
     fi
     
     for a in $(sort -u "$infile" | perl -npe 's/^perl\((.*)\)$/$1/;'); do
-        if test -n "$a"; then
+        if test -n "$ANY_VERSION"; then
+            echo "$a 0"
+        elif test -n "$a"; then
             @perlenv@ -I ${perl5libdir} -M$a -e 'print "'$a'"," ", $'$a'::VERSION,"\n";' 2>/dev/null || echo "$a 0" || true;
         fi
     done
@@ -114,9 +117,14 @@ function scan() {
             exit 1
         else
             set -o pipefail
+            echo "Scanning $scan_target..."
             if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" >>${workdir}/requires.tmp; then
                 echo "ERROR: could not resolve dependencies for $scan_target"
                 exit 1;
+            else
+                if test -n "$DEBUG"; then
+                    cat ${workdir}/requires.tmp
+                fi
             fi
         fi
     else
@@ -128,7 +136,7 @@ function scan() {
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-OPTS=$(getopt -o b:D:e:sphg:t:a:m:d:r:l:o:vxf:R:P:z -- "$@")
+OPTS=$(getopt -o Ab:D:e:sphg:t:a:m:d:r:l:o:vxf:R:P:z -- "$@")
 
 if [ $? -ne 0 ]; then
     echo "could not parse options"
@@ -141,6 +149,10 @@ set -e
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        -A)
+            ANY_VERSION="$1";
+            shift;
+            ;;
         -e)
             perl5bindir="$2";
             shift;
@@ -314,31 +326,38 @@ workdir=$(pwd)
 package_files=$(mktemp);
 exe_files=$(mktemp);
 
-if test -n "$perl5bindir"; then
-    find ${PROJECT_HOME}/${perl5bindir} -name '*.pl' > $exe_files;
-    find ${PROJECT_HOME}/${perl5bindir} -name '*.sh' >> $exe_files;
+if [ ! "$recurse_directories" = "yes" ]; then
+    maxdepth='-maxdepth 1'
 fi
 
+if test -n "$perl5bindir"; then
+    find ${PROJECT_HOME}/${perl5bindir} $maxdepth -name '*.pl' > $exe_files;
+    find ${PROJECT_HOME}/${perl5bindir} $maxdepth -name '*.sh' >> $exe_files;
+fi
+
+# set 'recurse' to 'no' and 'provides' to some value to specify your
+# own set of files to package
 if [ "$recurse_directories" = "yes" ]; then
     find ${PROJECT_HOME}/${perl5libdir} -name '*.pm' > $package_files;
-    
 else
     if test -n "$provides"; then
         if test -s "$provides"; then
-            for a in $(cat $provides); do
+            echo "$module.pm" >> $provides
+            for a in $(cat $provides) "$module.pm"; do
                 echo "${PROJECT_HOME}/${perl5libdir}/$a" >> $package_files
             done
+
         else
             echo "empty provides file"
             exit 1;
         fi
     else
-        echo "$module.pm" > $package_files
+        find ${PROJECT_HOME}/${perl5libdir} $maxdepth -name '*.pm' > $package_files;
     fi
 fi
 
 if test -z "$dependency_file"; then
-    for a in $(cat $package_files); do
+    for a in $(cat $package_files | sort -u); do
         required_module=${a##${PROJECT_HOME}/${perl5libdir}/}
         echo $required_module >> ${workdir}/provides.tmp
         mkdir -p $(dirname ${builddir}/lib/$required_module)
@@ -414,7 +433,7 @@ PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             -e $exe_files \
             -t ${workdir}/test-requires \
             -m "$module" \
-            -d "$description" \
+            -A "$description" \
             -a "$author" > $builddir/Makefile.PL
 
 # if that was successful, then try to build the distribution

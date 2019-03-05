@@ -180,6 +180,12 @@ The path where tests to be specified in the F<Makefile.PL> will be found.
 By default the package will provide the module to be packaged and any
 files included that were found if the C<recurse> option was specified.
 
+=item recurse (optional)
+
+Specifies whether to or not to looks in subdirectories of path
+specified by C<pm_module> for additional modules to pakcages.  The
+default is 'yes'.  Valid values are "yes" or "now".
+
 =item extra (optional)
 
 Name of a file that contains a list of files to be included in the package.
@@ -193,6 +199,10 @@ Example:
  extra-files:
    - ChangeLog
    - README
+
+=item exe_files (optional)
+
+Path to look for C<.pl> and C<.sh> files to package.
 
 =back
 
@@ -300,16 +310,16 @@ Example: $0 -m Some::Module -a 'Rob Lauer <rlauer6\@comcast.net>' -d 'my wonderf
 
 OPTIONS
 -------
--m, --module        module name
--b, --buildspec     read a buildspec and create command line
--a, --author        author
--d, --abstract      abstract
--r, --requires      dependency list
--M, --module-list   list of modules to include in distribution
--t, --test-requires test dependencies
--c, --cleanup       cleanup files, this is default
-                    use --no-cleanup to prevent cleanup
--v, --version       version
+-c, --cleanup         cleanup files, this is default
+                      use --no-cleanup to prevent cleanup
+-a, --author          author
+-b, --buildspec       read a buildspec and create command line
+-d, --abstract        abstract
+-m, --module          module name
+-M, --module-list     list of modules to include in distribution
+-r, --requires        dependency list
+-t, --test-requires   test dependencies
+-v, --version         version
 
 Typically, this script is called from the bash helper script of the same
 name (make-cpan-dist) or is invoked with a YAML file that specifies
@@ -336,7 +346,7 @@ GetOptions(\%options,
            "requires=s",
            "test-requires=s",
            "verbose|V",
-           "version=s"
+           "version|v=s"
           );
 
 if ( $options{version} ) {
@@ -377,6 +387,12 @@ if ( $options{buildspec} ) {
   # -m 
   if ( $buildspec->{pm_module} ) {
     $args{m} = $buildspec->{pm_module};
+  }
+  
+  if ( defined $buildspec->{'include-version'} ) {
+    if ( $buildspec->{'include-version'} =~/^(no|0|off)$/ ) {
+      $args{A} = '';
+    }
   }
   
   if ( $buildspec->{project} ) {
