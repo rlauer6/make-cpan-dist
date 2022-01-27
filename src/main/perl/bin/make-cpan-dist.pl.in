@@ -5,9 +5,12 @@
 use strict;
 use warnings;
 
+use Carp;
 use Data::Dumper;
+use English qw/-no_match_vars/;
 use Getopt::Long qw(:config no_ignore_case );
 use File::Temp qw/:POSIX/;
+use JSON::PP;
 
 use YAML::Syck;
 use Scalar::Util qw/reftype/;
@@ -30,11 +33,11 @@ make-cpan-spec.pl
 =head1 DESCRIPTION
 
 Utility that is part of the toolchain to create a simple CPAN
-distribution.  This utility is typically called from the C<bash> helper
+distribution. This utility is typically called from the C<bash> helper
 script of the same name or can be passed a build specfication file in
 YAML format.
 
-The helper script (F<make-cpan-dist>) does most of the heavy lifting
+The helper script (F<make-cpan-dist>) does most of the heavy lifting,
 doing things for you like attempting to resolve dependencies and
 packaging the distribution as a tarball.
 
@@ -55,7 +58,9 @@ F<lib> and some tests in a directory named F<t>, you might try:
  make-cpan-dist.pl -b buildspec.yml
 
 Calling this utility directly with the C<-b> option will invoke the
-C<bash> script and is probably the preferred way of using this toolchain. If you insist on using this utility directly anyway, read on.
+C<bash> script and is probably the preferred way of using this
+toolchain. If you insist on using this utility directly anyway, read
+on.
 
 =head1 OPTIONS
 
@@ -68,8 +73,8 @@ Name of the module
 =item -b, --buildspec
 
 Name of a build specification file.  The build specification file is
-used B<instead> of options and should be a YAML file that looks something
-like this:
+used B<instead> of options and should be a YAML file that looks
+something like this:
 
   project:
     git: https://github.com/rlauer6/perl-Amazon-Credentials
@@ -110,7 +115,8 @@ the utility now knows were to find your Perl module though.
 
 =item description
 
-The description of the module as it will be appear in the CPAN repository.
+The description of the module as it will be appear in the CPAN
+repository.
 
 =item author
 
@@ -248,12 +254,15 @@ C<bash> script and the files are transparent to you during the
 creation of the distribution.
 
 You can specify a different name for the files with the C<-r> and
-C<-t> options. You must however have a filed that contains the
-dependency list. Again, if you use the C<bash> script that invokes
-this utility or are calling this utility with a F<buildspec.yml> file,
-these files will be automatically created for you based on your
-options.  If you provide your own F<requires> or F<test-requires>
-file, modules should be listed as:
+C<-t> options.
+
+ B<You must however have a filed that contains the dependency list.>
+
+Again, if you use the C<bash> script that invokes this utility or are
+calling this utility with a F<buildspec.yml> file, these files will be
+I<automatically> created for you based on your options.  If you provide
+your own F<requires> or F<test-requires> file, modules should be
+listed as:
 
   module-name, version
 
@@ -271,13 +280,14 @@ Rob Lauer - <rlauer6@comcast.net>
 sub get_requires {
   my $requires = shift;
   
-  open my $fh, "<" . $requires or die "Could not get pre-requisites ($requires)\n";
+  open my $fh, '<', $requires
+    or croak "Could not get pre-requisites ($requires)\n";
 
   my %modules;
   
-  while (<$fh>) {
-    chomp;
-    my ($module, $version) = split /\s/;
+  while (my $line = <$fh>) {
+    chomp $line;
+    my ($module, $version) = split /\s/, $line;
     $modules{$module} = $version;
   }
   
@@ -291,10 +301,12 @@ sub get_modules {
   
   my @modules;
   
-  open my $fh, "<", $module_list or die "Could not open module list\n";
-  while (<$fh>) {
-    chomp;
-    push @modules, $_;
+  open my $fh, '<', $module_list
+    or croak "Could not open module list\n";
+  
+  while (my $line = <$fh>) {
+    chomp $line;
+    push @modules, $line;
   }
   
   close $fh;
@@ -313,12 +325,15 @@ OPTIONS
 -c, --cleanup         cleanup files, this is default
                       use --no-cleanup to prevent cleanup
 -a, --author          author
+-A, --any             do not require a version
 -b, --buildspec       read a buildspec and create command line
 -d, --abstract        abstract
 -m, --module          module name
 -M, --module-list     list of modules to include in distribution
+-n, --noversion       do not include versions
 -r, --requires        dependency list
 -t, --test-requires   test dependencies
+-s, --scandeps        use scandeps for dependency checking
 -v, --version         version
 
 Typically, this script is called from the bash helper script of the same
@@ -340,10 +355,13 @@ GetOptions(\%options,
            "buildspec=s",
            "cleanup!",
            "dryrun",
+           "debug|D",
            "exe-files=s",
            "help=s",
+           "noversion|n",
            "module=s",
-           "requires=s",
+           "requires|r=s",
+           "scandeps",
            "test-requires=s",
            "verbose|V",
            "version|v=s"
@@ -355,15 +373,15 @@ if ( $options{version} ) {
 }
 
 if ( $options{buildspec} ) {
-  die "file not found or empty " . $options{buildspec} . "\n"
-    unless -s $options{buildspec};
+  croak 'file not found or empty ' . $options{buildspec} . "\n"
+    if ! -s $options{buildspec};
   
   my $buildspec = eval {
     LoadFile($options{buildspec});
   };
   
-  die "could not read " . $options{buildspec} . "\n$@\n"
-    if $@;
+  croak 'could not read ' . $options{buildspec} . "\n$EVAL_ERROR\n"
+    if $EVAL_ERROR;
 
   #version: 0.1
   #
@@ -432,7 +450,7 @@ if ( $options{buildspec} ) {
     }
     
     if ( $args{D} && $args{r} ) {
-      die "use either path or resolver for dependencies, but not both\n";
+      croak "use either path or resolver for dependencies, but not both\n";
     }
   }
 
@@ -442,7 +460,7 @@ if ( $options{buildspec} ) {
       $args{R} = $buildspec->{path}->{recurse};
     }
     elsif ($buildspec->{path}->{recurse}) {
-      die "use only yes or no for 'recurse' option\n";
+      croak "use only yes or no for 'recurse' option\n";
     }
     
     # -l
@@ -476,12 +494,19 @@ if ( $options{buildspec} ) {
   if ( $buildspec->{extra} ) {
     $args{'-f'} = $buildspec->{extra};
   }
+  
+  # scandeps
+  $args{'-s'} = ''
+    if $options{scandeps};
 
+  $args{'-A'} = ''
+    if $options{noversion};
+  
   if ( $buildspec->{'extra-files'} && reftype($buildspec->{'extra-files'}) eq 'ARRAY' ) {
     my $extra_files = $buildspec->{extra} || 'extra-files';
     
-    open (my $fh, ">>$extra_files") or
-      die "could not append to $extra_files\n";
+    open (my $fh, ">$extra_files") or
+      croak "could not append to $extra_files\n";
     
     foreach (@{$buildspec->{'extra-files'}}) {
       print $fh "$_\n";
@@ -502,7 +527,7 @@ if ( $options{buildspec} ) {
     $args{'-P'} = "provides";
   }
   
-  unless ( $options{dryrun} ) {
+  if ( !$options{dryrun} ) {
     exec '@bindir@/make-cpan-dist ' . join(" ", %args);
   }
   else {
@@ -520,8 +545,8 @@ if ( $options{help} || ! ($module && $author && $abstract) ) {
   exit;
 }
 
-die "no dependencies\n"
-  unless $options{requires};
+croak "no dependencies\n"
+  if ! $options{requires};
 
 while ($module =~s/::/\//g) {}
 $module = 'lib/' . $module . '.pm';
@@ -551,7 +576,9 @@ else {
 my @exe_file_list;
 
 if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
-  open (my $fh, '<' . $options{'exe-files'}) or die "could not open " . $options{'exe-files'} . "\n";
+  open (my $fh, '<' . $options{'exe-files'})
+    or croak "could not open " . $options{'exe-files'} . "\n";
+  
   while (<$fh>) {
     chomp;
     s/^.*\/(.*)$/bin\/$1/;
@@ -562,7 +589,42 @@ if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
 
 my $exe_files = Dumper \@exe_file_list;
 
-print <<eot;
+my $META_MERGE;
+
+if ( -e "provides" ) {
+
+  open my $fh, '<', 'provides'
+    or croak "could not open provides\n";
+
+  my %provides;
+  
+  while (my $module = <$fh>) {
+    chomp $module;
+    
+    my $file = join("/", split /::/, $module) . '.pm';
+    my $version;
+    
+    {
+      require $file;
+      $version = eval "\$${module}::VERSION";
+    }
+    
+    $provides{$module} = { file => "lib/$file", version => "$version" };
+  }
+  
+  close $fh;
+
+  {
+    $Data::Dumper::Pair = '=>';
+    $META_MERGE = "META_MERGE => " . Dumper({"meta-spec" =>  { version => 2},
+                                             "provides" => \%provides });
+  }
+  
+  print STDERR $META_MERGE
+    if $options{debug};
+}
+
+my $MAKEFILE = <<eot;
 
 use strict;
 use warnings;
@@ -577,7 +639,11 @@ WriteMakefile(
     PL_FILES       => {},
     EXE_FILES      => $exe_files,
     PREREQ_PM      => $pre_req,
-    TEST_REQUIRES  => $test_req
+    TEST_REQUIRES  => $test_req,
+    $META_MERGE
 );
 eot
+
+print STDERR $MAKEFILE;
+print $MAKEFILE;
 

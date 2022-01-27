@@ -1,3 +1,5 @@
+**/*.1man
+autotools/*
 aclocal.m4
 configure
 tags
@@ -35,3 +37,4 @@ autom4te.cache/
 src/main/perl/**/*.pm
 src/main/perl/**/*.pl
 src/main/bash/**/*.sh
+src/main/bash/bin/make-cpan-dist

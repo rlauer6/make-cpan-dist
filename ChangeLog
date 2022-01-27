@@ -1,3 +1,34 @@
+Wed Jan 26 14:21:40 2022  Rob Lauer  <rlauer@apple.com>
+
+	[1.4.0]: MacOS
+	* src/main/bash/bin/make-cpan-dist.in
+	- -T option for test dependency file
+	- don't remov requires or provides
+	- echo errors to stderr
+	- while read -r a, not for a in
+	- support scandeps output
+	- use getopt since MacOS is allergic to getopts :-(
+	- if dependency file given, copy files to builddir
+	- sort -u provides
+	(cleanup)
+	- just remove .tmp files
+	* .gitignore
+	- + generated files
+	- man files
+	* autotools/install-sh: removed
+	* autotools/missing: removed
+	* configure.ac: bump
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- croak, don't die
+	- case insensitive options
+	- use JSON::PP, not JSON
+	- some refactoring
+	- -A option (any version)
+	- -n, don't include versions
+	- -s use scandeps
+	- -D debug
+	- META_MERGE (provides)
+
 Tue Mar  5 15:09:25 2019  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.3.0]: any version
@@ -9,7 +40,7 @@ Tue Mar  5 15:09:25 2019  Rob Lauer  <rlauer6@comcast.net>
 	* src/main/perl/bin/make-cpan-dist.pl.in
 	- disambiguate -v
 	- support include-version option in buildspec (any version)
-	
+
 Sat Feb 23 16:33:01 2019  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.2.1]: extra-files
