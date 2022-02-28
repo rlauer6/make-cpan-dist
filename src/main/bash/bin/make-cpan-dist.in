@@ -34,8 +34,8 @@ Options
 
 NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables.
 
-Copyright (c) 2022 Robert C. Lauer, All rights reserved.
-This is free software and may be used for any purpose without charge.
+This script is free software. It may be used, redistributed and/or
+modified under the same terms as Perl itself.
 EOT
     
     exit;
@@ -65,7 +65,6 @@ function find_git_home {
 function cleanup {
 
     test -n "$NOCLEANUP" && return;
-    
     test -n "$testsfile" && rm "$testsfile"
     test -n "$tmp_gitdir" && rm -rf "$tmp_gitdir"
     test -n "$package_files" && rm "$package_files"
@@ -133,7 +132,7 @@ function scan() {
         else
             set -o pipefail
             >&2 echo "Scanning $scan_target..."
-            if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" >>${workdir}/requires.tmp; then
+            if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" | awk '{print $1}' >> ${workdir}/requires.tmp; then
                 >&2 echo "ERROR: could not resolve dependencies for $scan_target"
                 exit 1;
             else
@@ -189,8 +188,8 @@ while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:" arg "$@"; do
         P)
             provides="$OPTARG";
             test -n "$provides" && recurse_directories="no"
-
             ;;
+
         f)
             EXTRA="$OPTARG";
             ;;
@@ -220,7 +219,7 @@ while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:" arg "$@"; do
 	    ;;
 
         m)
-            module="$OPTARG";
+            MODULE="$OPTARG";
             ;;
 
         d)
@@ -255,7 +254,7 @@ if test -n "$BUILDSPEC"; then
     exit $?;
 fi
 
-test -z "$module" && usage "no module specified";
+test -z "$MODULE" && usage "no module specified";
 test -z "$author" && usage "no author specified";
 test -z "$description" && usage "no description";
 
@@ -291,7 +290,7 @@ builddir=$(mktemp -d)
 
 trap cleanup EXIT
 
-module_file="$(echo "$module" | perl -npe "s/::/\//g").pm"
+module_file="$(echo "$MODULE" | perl -npe "s/::/\//g").pm"
 
 mkdir -p ${builddir}/lib/$(dirname $module_file);
     
@@ -302,10 +301,20 @@ fi
 
 if test -n "$EXTRA"; then
     if test -s "$EXTRA"; then
-        for a in $(cat $EXTRA); do
-            test -d $(dirname $a) || mkdir -p $(dirname $a)
-            cp $a $builddir
-        done
+        while IFS=' ' read -r a b
+        do
+            echo "$a $b"
+            if [ -f "$a" ]; then
+                if test -n "$b"; then
+                   dir=$(dirname $b)
+                   test -d $dir || mkdir -p $builddir/$dir
+                fi
+                cp $a $builddir/$dir
+            else
+                echo "file [$a] not found?"
+                exit 1
+            fi
+        done <"$EXTRA"
     else
         echo "No EXTRA file ($EXTRA) found in $(pwd)!"
     fi
@@ -331,8 +340,8 @@ if [ "$recurse_directories" = "yes" ]; then
 else
     if test -n "$provides"; then
         if test -s "$provides"; then
-            echo "$module.pm" >>$provides
-            for a in $(cat $provides) "$module.pm"; do
+            echo "$MODULE.pm" >>$provides
+            for a in $(cat $provides) "$MODULE.pm"; do
                 echo "${PROJECT_HOME}/${perl5libdir}/$a" >> $package_files
             done
 
@@ -438,7 +447,7 @@ PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             -r ${workdir}/requires \
             -e $exe_files \
             -t ${workdir}/test-requires \
-            -m "$module" \
+            -m "$MODULE" \
             -A "$description" \
             -a "$author" > $builddir/Makefile.PL
 

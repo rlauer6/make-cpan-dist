@@ -1,4 +1,20 @@
-Wed Jan 26 14:21:40 2022  Rob Lauer  <rlauer@apple.com>
+Mon Feb 28 14:42:22 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.4.1]:
+	* README.md
+	* src/main/bash/bin/make-cpan-dist.in
+	(scan)
+	- MODULE, not module
+	- only want 1st arg of scandeps output
+	- extra-files format - source dest
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- pod
+	- scandeps|s
+	- allow directories in extra-files
+	- resources section
+	- install files to share directory
+
+Wed Jan 26 14:21:40 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.4.0]: MacOS
 	* src/main/bash/bin/make-cpan-dist.in

@@ -13,7 +13,8 @@ toolchain (`cpanm`) to vendor libraries for use with AWS Lambdas, I've
 recently needed a quick and easy CPAN distribution creation utility.
 Hence this project.
 
-After installing the project you'll find more information by reading the man page.
+After installing the project you'll find more information by reading
+the man page.
 
 ```
 man make-cpan-dist
@@ -43,9 +44,9 @@ _pull requests are welcome too_.
 Well, to be upfront about it, __maybe it's not__. Personally, I like
 to take a bunch of steps I seldom will remember and package them in
 self-contained utilities so that processes can be automated and
-forgotten about. I guess this this approach works for me, but as
-always YMMV. As I mentioned, I'm also using this utility as a
-component of a CI/CD pipeline.
+forgotten about. This approach works for me, but as always YMMV. As I
+mentioned, I'm also using this utility as a component of a CI/CD
+pipeline.
 
 If after looking at this project you are shaking your head and wagging
 your finger, then count yourself among those who have opined that I
@@ -88,7 +89,8 @@ make && make install
 
 ## Why did you _autoconfiscate_ a project that has just 1 Perl script and 1 bash script?
 
-Before we go any further, I'll bet I need to answer that question.  So, in no particular order...
+Before we go any further, I'll bet I need to answer that question.
+So, in no particular order...
 
 * Habit
 * Automation malleability
@@ -136,7 +138,9 @@ __direct__ dependencies.  In fact, it does a much better job than
 `scandeps.pl` or any of the other dependency resolvers you might
 stumble across.  That's not to say that it is fool proof or even a
 good dependency checker for Perl.  That is a subject of a long blog
-post I think I should write some day.
+post I think I should write some day. Oh wait I did...
+
+[Perl Dependency Checking] (http://blogs.perl.org/users/rlauer/2019/01/perl-dependency-checking.html)
 
 If you are running on a Debian based system you can grab
 `/usr/lib/rpm/perl.req` from the `rpm` package apparently.
@@ -162,7 +166,6 @@ make-cpan-dist -a 'Rob Lauer <rlauer6@comcast.net>' \
 * `Perl::PrereqScanner`
 
 ...all of which will give about the same results as `scandeps.pl`
-
 
 Create a bash function...`dep_resolver`?...then give it a go.
 
@@ -230,7 +233,7 @@ to the root of the project or your current working directory if you
 are not specifying a git repository as the source of your
 package.
 
-If youru project includes perl scripts, you can add those to your
+If your project includes perl scripts, you can add those to your
 distribution by setting the path to those with the `exe_files`
 subsection of `path`.  These will be packaged and installed in the
 `bin` directory (INSTALLBIN).
@@ -356,7 +359,7 @@ make a pull request. ;-)
 
 The hardest way to create a CPAN distribution using this utility is to
 provide a file that contains the dependencies for your module by
-creating one yourself.  As long as we are doing things the hard way,
+creating one yourself. As long as we are doing things the hard way,
 create another dependency file for the tests you have included and
 then invoke the Perl script directly by providing all of the necessary
 options.

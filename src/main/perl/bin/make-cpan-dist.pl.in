@@ -7,13 +7,15 @@ use warnings;
 
 use Carp;
 use Data::Dumper;
-use English qw/-no_match_vars/;
-use Getopt::Long qw(:config no_ignore_case );
-use File::Temp qw/:POSIX/;
-use JSON::PP;
+use English qw{ -no_match_vars };
+use Getopt::Long qw{:config no_ignore_case };
+use File::Find;
+use File::Basename;
+use File::Temp qw{ :POSIX };
+use JSON::PP qw{ encode_json decode_json };
 
 use YAML::Syck;
-use Scalar::Util qw/reftype/;
+use Scalar::Util qw{ reftype };
 
 our $VERSION = '@PACKAGE_VERSION@';
 
@@ -186,6 +188,12 @@ The path where tests to be specified in the F<Makefile.PL> will be found.
 By default the package will provide the module to be packaged and any
 files included that were found if the C<recurse> option was specified.
 
+=item resources (optional)
+
+Keys to add to the resources section.  This section is merged into the
+META_MERGE key.  See L<https://metacpan.org/pod/CPAN::Meta::Spec> for
+more details.
+
 =item recurse (optional)
 
 Specifies whether to or not to looks in subdirectories of path
@@ -205,6 +213,17 @@ Example:
  extra-files:
    - ChangeLog
    - README
+   -
+     examples: ../src/examples
+
+If you include in your extra-files specification, a 'share' directory,
+then that directory will be installed as part of the
+distribution.
+
+I<This feature is only avaiable when the directory is specified in the
+C<extra-files> key of the F<buildspec.yml> file. Files specified in
+the C<extra> section will be copied to the root of the distribution
+tarball and will not be automatically installed.>
 
 =item exe_files (optional)
 
@@ -361,7 +380,7 @@ GetOptions(\%options,
            "noversion|n",
            "module=s",
            "requires|r=s",
-           "scandeps",
+           "scandeps|s",
            "test-requires=s",
            "verbose|V",
            "version|v=s"
@@ -501,15 +520,47 @@ if ( $options{buildspec} ) {
 
   $args{'-A'} = ''
     if $options{noversion};
-  
+
   if ( $buildspec->{'extra-files'} && reftype($buildspec->{'extra-files'}) eq 'ARRAY' ) {
     my $extra_files = $buildspec->{extra} || 'extra-files';
     
     open (my $fh, ">$extra_files") or
       croak "could not append to $extra_files\n";
     
-    foreach (@{$buildspec->{'extra-files'}}) {
-      print $fh "$_\n";
+    foreach my $e (@{$buildspec->{'extra-files'}}) {
+      
+      if ( !ref($e) ) {
+        print $fh "$e \n";
+      }
+      elsif ( reftype($e) eq 'HASH' ) {
+        my ($destdir) = keys %{$e};
+        
+        $destdir .= '/'
+          if !$destdir =~/\/$/;
+        
+        my $file_list = $e;
+        
+        if ( ref($file_list) && reftype($file_list) ne 'ARRAY') {
+          $file_list = [ values %{$file_list} ];
+        }
+        elsif (!ref $file_list) {
+          $file_list = [ $file_list ];
+        }
+
+        for my $f (@{$file_list}) {
+          if ( -d $f ) {
+            find(sub {
+                   if ( $_ !~/^\.\.?$/ ) {
+                     print $fh "$File::Find::name $destdir/$_\n";
+                   }
+                 }, $f);
+          }
+          else {
+            my ($name, $path, $ext) = fileparse($f, qr/\.[^.]*/);
+            print $fh "$f $destdir/$name$ext\n";
+          }
+        }
+      }
     }
     
     close $fh;
@@ -524,7 +575,16 @@ if ( $options{buildspec} ) {
     }
     
     close $fh;
-    $args{'-P'} = "provides";
+    $args{'-P'} = 'provides';
+  }
+
+  if ( $buildspec->{resources} ) {
+    open my $fh, '>', 'resources'
+      or croak "could not open resources for writing\n";
+    
+    print $fh encode_json($buildspec->{'resources'});
+    
+    close $fh;
   }
   
   if ( !$options{dryrun} ) {
@@ -591,7 +651,7 @@ my $exe_files = Dumper \@exe_file_list;
 
 my $META_MERGE;
 
-if ( -e "provides" ) {
+if ( -e "provides" || -e "resources" ) {
 
   open my $fh, '<', 'provides'
     or croak "could not open provides\n";
@@ -614,10 +674,28 @@ if ( -e "provides" ) {
   
   close $fh;
 
+  my $resources;
+  
+  if ( -e 'resources' ) {
+    open my $fh, '<', 'resources'
+      or croak "could not open resources\n";
+    
+    local $RS;
+    $resources = <$fh>;
+    $resources = decode_json($resources);
+
+    close $fh;
+  }
+
   {
     $Data::Dumper::Pair = '=>';
-    $META_MERGE = "META_MERGE => " . Dumper({"meta-spec" =>  { version => 2},
-                                             "provides" => \%provides });
+    $META_MERGE         = "META_MERGE => "
+      . Dumper(
+      { "meta-spec" => { version => 2 },
+        "provides"  => \%provides,
+        $resources ? ( "resources" => $resources ) : ()
+      }
+      );
   }
   
   print STDERR $META_MERGE
@@ -628,7 +706,13 @@ my $MAKEFILE = <<eot;
 
 use strict;
 use warnings;
+
 use ExtUtils::MakeMaker;
+use File::ShareDir::Install;
+
+if ( -d 'share' ) {
+  install_share 'share';
+}
 
 WriteMakefile(
     NAME           => '$options{module}',
@@ -642,6 +726,11 @@ WriteMakefile(
     TEST_REQUIRES  => $test_req,
     $META_MERGE
 );
+
+package MY;
+
+use File::ShareDir::Install qw( postamble );
+
 eot
 
 print STDERR $MAKEFILE;
