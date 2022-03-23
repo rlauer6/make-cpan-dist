@@ -11,15 +11,18 @@ perlwc = @ENV@ @PERL@
 ax_perl5_extra_includes_opt = @ax_perl5_extra_includes_opt@
 ax_perl5_extra_includes = @ax_perl5_extra_includes@
 
-PERLMODULES =
+PERLMODULES = \
+    File/Process.pm.in
 
 GPERLMODULES = $(PERLMODULES:.pm.in=.pm)
-G1MANPAGES = $(GPERLSCRIPTS:.pm=.1man)
+G3MANPAGES = $(GPERLSCRIPTS:.pm=.3man)
 
-perl5lib_DATA = $(GPERLMODULES)
+filedir = $(perl5libdir)/File
+file_DATA = $(GPERLMODULES)
+
 dist_noinst_DATA = $(PERLMODULES)
 
-man1_MANS = $(G1MANPAGES)
+man3_MANS = $(G3MANPAGES)
 
 @do_subst_command@
 
@@ -44,14 +47,16 @@ all:
 
 CLEANFILES = $(GPERLMODULES)
 
-$(G1MANPAGES): %.1man : %.pm
-	target_name="$@";\
-	tname=$$(echo "$${target_name}" | sed -e 's/\.1man$$//') ;\
-	"$(POD2MAN)"  $< \
+$(G3MANPAGES): %.3man : %.pm
+	set -x; \
+	target_name="$@"; \
+	echo $$target_name; \
+	tname=$$(echo "$${target_name}" | sed -e 's/\.3man$$//') ;\
+	"$(POD2MAN)"  \
 	--center="$(PACKAGE)" \
 	--name="$${tname}" \
 	--release=$(PACKAGE)-$(VERSION) \
-	--section=1man > "$${target_name}" || true
+	--section=3man $< "$${target_name}" || touch "$${target_name}"
 
 .PHONY: clean-local
 clean-local:
@@ -59,8 +64,20 @@ clean-local:
 
 .PHONY: clean-generated-man-pages
 clean-generated-man-pages:
-	for mpath in $(G1MANPAGES); do \
-	rm -f "$${mpath}" ;\
-	test $$? -eq 0 || exit 1 ;\
+	for f in *.3man; do \
+	  echo "$$f"; \
+	  rm -f "$$f" ;\
 	done
 
+install-data-hook:
+	for a in $(G3MANPAGES); do \
+	  target_name=$$(echo "$$a" | sed -e 's/\//::/g'); \
+	  mv $(DESTDIR)$(mandir)/man3/$$(basename $$a) \
+	     $(DESTDIR)$(mandir)/man3/$${target_name}; \
+	done
+
+uninstall-local:
+	for a in $(G3MANPAGES); do \
+	  target_name=$$(echo "$$a" | sed -e 's/\//::/g'); \
+	  rm -f $(DESTDIR)$(mandir)/man3/$${target_name}; \
+	done

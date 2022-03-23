@@ -9,15 +9,627 @@ use Carp;
 use Data::Dumper;
 use English qw{ -no_match_vars };
 use Getopt::Long qw{:config no_ignore_case };
+use ExtUtils::MM;
 use File::Find;
 use File::Basename;
 use File::Temp qw{ :POSIX };
+use File::Process qw{ process_file };
+use List::Util qw{ pairs };
 use JSON::PP qw{ encode_json decode_json };
-
-use YAML::Syck;
+use YAML::Tiny;
 use Scalar::Util qw{ reftype };
+use ReadonlyX;
+
+Readonly my $TRUE         => 1;
+Readonly my $FALSE        => 1;
+Readonly my $DASH         => q{-};
+Readonly my $DOUBLE_COLON => q{::};
+Readonly my $EMPTY        => q{};
+Readonly my $FAILURE      => 0;
+Readonly my $FAT_ARROW    => q{=>};
+Readonly my $INDENT       => 4;
+Readonly my $NL           => qq{\n};
+Readonly my $SH_FAILURE   => 1;
+Readonly my $SH_SUCCESS   => 0;
+Readonly my $SLASH        => q{/};
+Readonly my $SPACE        => q{ };
+Readonly my $SUCCESS      => 1;
 
 our $VERSION = '@PACKAGE_VERSION@';
+
+sub help {
+  print <<"END_OF_TEXT";
+usage: $PROGRAM_NAME OPTIONS
+
+Example: $PROGRAM_NAME -m Some::Module -a 'Rob Lauer <rlauer6\@comcast.net>' -d 'my wonderful module'
+
+OPTIONS
+-------
+-c, --cleanup         cleanup files, this is default
+                      use --no-cleanup to prevent cleanup
+-a, --author          author
+-A, --any             do not require a version
+-b, --buildspec       read a buildspec and create command line
+-d, --abstract        abstract
+-m, --module          module name
+-M, --module-list     list of modules to include in distribution
+-n, --noversion       do not include versions
+-r, --requires        dependency list
+-t, --test-requires   test dependencies
+-s, --scandeps        use scandeps for dependency checking
+-v, --version         version
+
+Typically, this script is called from the bash helper script of the same
+name (make-cpan-dist) or is invoked with a YAML file that specifies
+the parmeters used to build a distribution.
+
+See https://github.com/rlauer6/make-cpan-dist.git for more documentation.
+
+See man make-cpan-dist
+
+END_OF_TEXT
+  return $SH_FAILURE;
+} ## end sub help
+
+sub get_exe_file_list {
+  my ($file) = @_;
+
+  my $lines;
+  if ($file) {
+    ($lines) = process_file(
+      $file,
+      chomp            => $TRUE,
+      skip_blank_lines => $TRUE,
+      process          => sub {
+        my $f = pop @_;
+        $f =~ s/^.*\/(.*)$/bin\/$1/xsm;
+        return $f;
+      }
+    );
+  } ## end if ($file)
+
+  return $lines ? @{$lines} : ();
+} ## end sub get_exe_file_list
+
+sub make_path_from_module {
+  my ($module) = @_;
+
+  my $file = join $SLASH, split /$DOUBLE_COLON/xsm, $module;
+
+  return "$file.pm";
+} ## end sub make_path_from_module
+
+sub get_provides {
+  my ($file) = @_;
+
+  my %provides;
+
+  if ($file) {
+    my ($lines) = process_file(
+      $file,
+      chomp            => $TRUE,
+      skip_blank_lines => $TRUE,
+      prefix           => '/usr/local/share/perl5',
+      process          => sub {
+        my $provided_module = pop @_;
+        my $args            = pop @_;
+
+        if ( !$provided_module ) {
+          return ();
+        }
+
+        my $path = make_path_from_module($provided_module);
+        $path = $args->{'prefix'} . $SLASH . $path;
+
+        my $version = eval { return ExtUtils::MM->parse_version($path); };
+
+        $provides{$provided_module} = {
+          file    => $path,
+          version => $version // 0,
+        };
+
+        return $provided_module;
+      }
+    );
+  } ## end if ($file)
+  return %provides;
+} ## end sub get_provides
+
+sub get_resources {
+  goto &get_json_file;
+}
+
+sub get_json_file {
+  my ($file) = @_;
+
+  my ($json) = process_file(
+    $file,
+    chomp       => 1,
+    merge_lines => 1
+  );
+
+  return decode_json($json);
+} ## end sub get_json_file
+
+sub write_resources {
+  my ( $resources, %args ) = @_;
+
+  my $resources_file;
+
+  if ($resources) {
+    $resources_file = 'resources';
+
+    open my $fh, '>', $resources_file
+      or croak "could not open resources for writing\n";
+
+    print {$fh} encode_json($resources);
+
+    close $fh
+      or croak "could not close file $resources_file\n";
+  } ## end if ($resources)
+
+  return %args;
+} ## end sub write_resources
+
+sub write_provides {
+  my ( $provides, %args ) = @_;
+
+  my $provides_file;
+
+  if ($provides) {
+    $provides_file = 'provides';
+
+    open my $fh, '>', $provides_file
+      or croak "could not open 'provides' for writing\n";
+
+    foreach my $file ( @{$provides} ) {
+      print {$fh} "$file\n";
+    }
+
+    close $fh
+      or croak "could not close 'provides'\n";
+
+    $args{P} = $provides_file;
+  } ## end if ($provides)
+
+  return %args;
+} ## end sub write_provides
+
+sub write_makefile {
+  my (%options) = @_;
+
+  my $module = $options{'module'};
+  my $author = $options{'author'} || 'Anonyous <anonymous@example.com>';
+  my $module_abstract = $options{'abstract'} || 'my awesome Perl module!';
+
+  if ( $options{'help'} || !( $module && $author && $module_abstract ) ) {
+    return help();
+  }
+
+  croak "no dependencies\n"
+    if !$options{'requires'};
+
+  while ( $module =~ s/::/\//xsmg ) { }
+
+  $module = 'lib/' . $module . '.pm';
+
+  local $Data::Dumper::Terse    = 1;
+  local $Data::Dumper::Sortkeys = 1;
+  local $Data::Dumper::Indent   = 2;
+  local $Data::Dumper::Pad      = $SPACE x $INDENT;
+
+  $options{'requires'} = $options{'requires'} || 'requires';
+
+  $options{'test-requires'} = $options{'test-requires'} || 'test-requires';
+
+  my $pre_req = Dumper get_requires( $options{'requires'} );
+  $pre_req =~ s/^\s*(.*?)$/$1/xsm;
+  chomp $pre_req;
+
+  my $test_req = {};
+
+  if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
+    $test_req = Dumper get_requires( $options{'test-requires'} );
+    $test_req =~ s/^\s*(.*?)$/$1/xsm;
+  }
+  else {
+    $test_req = Dumper $test_req;
+  }
+
+  my @exe_file_list;
+
+  if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
+    @exe_file_list = get_exe_file_list( $options{'exe-files'} );
+  }
+
+  my $exe_files = Dumper \@exe_file_list;
+
+  my %provides;
+
+  if ( -e 'provides' ) {
+    %provides = get_provides('provides');
+  }
+
+  my $resources;
+
+  if ( -e 'resources' ) {
+    $resources = get_resources('resources');
+  }
+
+  my $META_MERGE = 'META_MERGE ' . $FAT_ARROW;
+
+  {
+    local $Data::Dumper::Pair = $FAT_ARROW;
+
+    $META_MERGE .= Dumper(
+      { 'meta-spec' => { version => 2 },
+        'provides'  => \%provides,
+        $resources ? ( 'resources' => $resources ) : ()
+      }
+    );
+  }
+
+  my $MAKEFILE = <<"END_OF_TEXT";
+
+use strict;
+use warnings;
+
+use ExtUtils::MakeMaker;
+use File::ShareDir::Install;
+
+if ( -d 'share' ) {
+  install_share 'share';
+}
+
+WriteMakefile(
+    NAME           => '$options{module}',
+    AUTHOR         => '$author',
+    VERSION_FROM   => '$module',
+    ABSTRACT       => '$module_abstract',
+    LICENSE        => 'perl',
+    PL_FILES       => {},
+    EXE_FILES      => $exe_files,
+    PREREQ_PM      => $pre_req,
+    TEST_REQUIRES  => $test_req,
+    $META_MERGE
+);
+
+package MY;
+
+use File::ShareDir::Install qw( postamble );
+
+END_OF_TEXT
+
+  if ( $options{'debug'} ) {
+    print {*STDERR} $MAKEFILE;
+  }
+
+  print $MAKEFILE;
+
+  return $SH_SUCCESS;
+} ## end sub write_makefile
+
+sub write_file_list {
+  my ( $file_list, $destdir ) = @_;
+
+  my @expanded_list;
+
+  for my $f ( @{$file_list} ) {
+    if ( -d $f ) {
+      find(
+        sub {
+          if ( !/^[.]+$/xsm ) {
+            push @expanded_list, "$File::Find::name $destdir/$_";
+          }
+        },
+        $f
+      );
+    } ## end if ( -d $f )
+    else {
+      # the intent is to cp files to root of distribution (not
+      # to install the files during package installation...the
+      # exception being if items are installed into share
+      # directory
+      my ( $name, $path, $ext ) = fileparse( $f, qr/[.][^.]*/xsm );
+      push @expanded_list, "$f $destdir/$name$ext\n";
+    } ## end else [ if ( -d $f ) ]
+  } ## end for my $f ( @{$file_list...})
+
+  return @expanded_list;
+} ## end sub write_file_list
+
+# file name or hash
+# extra-files:
+#   share:
+#     - ../README.md
+#     - ../ChangeLog
+#   examples: ../src/examples
+# extra-files:
+#   - file
+
+sub write_extra_files {
+  my ( $extra_files, $extra, %args ) = @_;
+
+  return %args
+    if !ref $extra_files || reftype($extra_files) ne 'ARRAY';
+
+  my $extra_files_path = $extra || 'extra-files';
+
+  my @file_list;
+
+  foreach my $e ( @{$extra_files} ) {
+
+    if ( !ref $e ) {
+      push @file_list, $e;
+    }
+    elsif ( reftype($e) eq 'HASH' ) {
+      my ($destdir) = keys %{$e};
+
+      if ( $destdir !~ /\/$/xsm ) {
+        $destdir .= $SLASH;
+      }
+
+      my $file_list = $e;
+
+      if ( ref($file_list) && reftype($file_list) ne 'ARRAY' ) {
+        $file_list = [ values %{$file_list} ];
+      }
+      elsif ( !ref $file_list ) {
+        $file_list = [$file_list];
+      }
+
+      push @file_list, write_file_list( $file_list, $destdir );
+
+    } ## end elsif ( reftype($e) eq 'HASH')
+  } ## end foreach my $e ( @{$extra_files...})
+
+  open my $fh, '>', $extra_files_path
+    or croak "could not append to $extra_files_path\n";
+
+  print {$fh} join "\n", @file_list;
+
+  close $fh
+    or croak "could not close $extra_files_path\n";
+
+  $args{f} = $extra_files_path;
+
+  return %args;
+} ## end sub write_extra_files
+
+sub parse_path {
+  my ( $path, %args ) = @_;
+
+  if ($path) {
+    if ( $path->{'recurse'}
+      && $path->{'recurse'} =~ /(yes|no)/ixsm ) {
+      $args{R} = $path->{'recurse'};
+    }
+    elsif ( $path->{'recurse'} ) {
+      croak "use only yes or no for 'recurse' option\n";
+    }
+
+    # -l
+    if ( $path->{'pm_module'} ) {
+      $args{l} = $path->{'pm_module'};
+    }
+
+    # -e
+    if ( $path->{'exe_files'} ) {
+      $args{e} = $path->{'exe_files'};
+    }
+
+    # -t
+    if ( $path->{'tests'} ) {
+      $args{t} = $path->{'tests'};
+    }
+  } ## end if ($path)
+  return %args;
+} ## end sub parse_path
+
+sub parse_dependencies {
+  my ( $dependencies, %args ) = @_;
+
+  if ($dependencies) {
+    if ( $dependencies->{'path'} ) {
+      $args{D} = $dependencies->{'path'};
+    }
+
+    if ( my $resolver = $dependencies->{'resolver'} ) {
+      if ( $resolver eq 'scandeps' ) {
+        $args{s} = $EMPTY;
+      }
+      else {
+        $args{r} = $dependencies->{'resolver'};
+      }
+    } ## end if ( my $resolver = $dependencies...)
+
+    if ( $args{D} && $args{r} ) {
+      croak "use either path or resolver for dependencies, but not both\n";
+    }
+  } ## end if ($dependencies)
+
+  return %args;
+} ## end sub parse_dependencies
+
+sub parse_include_version {
+  my ( $version, %args ) = @_;
+
+  if ( defined $version ) {
+    if ( $version =~ /(no|0|off)/xsm ) {
+      $args{A} = $EMPTY;
+    }
+  }
+  return %args;
+} ## end sub parse_include_version
+
+sub parse_project {
+  my ( $project, %args ) = @_;
+
+  if ($project) {
+    if ( $project->{'author'} ) {
+      $args{a} = $project->{'author'}->{'name'};
+
+      if ( $project->{'author'}->{'mailto'} ) {
+        $args{a} .= ' <' . $project->{'author'}->{'mailto'} . '>';
+      }
+
+      $args{a} = sprintf q{'%s'}, $args{a};
+    } ## end if ( $project->{'author'...})
+
+    # -d
+    if ( $project->{'description'} ) {
+      $args{d} = sprintf q{'%s'}, $project->{'description'};
+    }
+
+    # -g
+    if ( $project->{'git'} ) {
+      $args{g} = $project->{'git'};
+    }
+  } ## end if ($project)
+
+  return %args;
+} ## end sub parse_project
+
+sub parse_pm_module {
+  my ( $pm_module, %args ) = @_;
+
+  if ($pm_module) {
+    $args{m} = $pm_module;
+  }
+  return %args;
+} ## end sub parse_pm_module
+
+sub get_buildspec {
+  my ($file) = @_;
+
+  croak 'file not found or empty ' . $file . $NL
+    if !-s $file;
+
+  my $buildspec = eval { YAML::Tiny->read($file)->[0]; };
+
+  croak 'could not read ' . $file . $NL . $EVAL_ERROR . $NL
+    if $EVAL_ERROR || !$buildspec;
+
+  return $buildspec;
+} ## end sub get_buildspec
+
+sub parse_buildspec {
+  my (%options) = @_;
+
+  my $file = $options{buildspec};
+
+  my $buildspec = get_buildspec($file);
+
+  my %args;
+
+  %args = parse_project( $buildspec->{project}, %args );
+
+  %args = parse_pm_module( $buildspec->{'pm_module'}, %args );
+
+  %args = parse_include_version( $buildspec->{'include-version'}, %args );
+
+  %args = parse_dependencies( $buildspec->{'dependencies'}, %args );
+
+  %args = parse_path( $buildspec->{path}, %args );
+
+  %args = write_extra_files( $buildspec->{'extra-files'},
+    $buildspec->{'extra'}, %args );
+
+  %args = write_provides( $buildspec->{'provides'}, %args );
+
+  %args = write_resources( $buildspec->{'resources'}, %args );
+
+  # set boolean args from options
+
+  my @boolean_args = qw{ verbose v cleanup x scandeps s noversion A };
+
+  foreach my $pair ( pairs @boolean_args ) {
+    my ( $key, $value ) = @{$pair};
+
+    if ( $options{$key} ) {
+      $args{$value} = $EMPTY;
+    }
+  } ## end foreach my $pair ( pairs @boolean_args)
+
+  # set value args from buildspec
+  foreach my $pair ( pairs qw{ destdir o extra f } ) {
+    my ( $key, $value ) = @{$pair};
+
+    if ( $buildspec->{$key} ) {
+      $args{$value} = $buildspec->{$key};
+    }
+  } ## end foreach my $pair ( pairs qw{ destdir o extra f })
+
+  foreach my $k ( keys %args ) {
+    $args{ $DASH . $k } = $args{$k};
+    delete $args{$k};
+  }
+
+  return %args;
+} ## end sub parse_buildspec
+
+sub get_requires {
+  my ($requires) = @_;
+
+  my %modules;
+
+  process_file(
+    $requires,
+    chomp   => $TRUE,
+    process => sub {
+      my $line = pop @_;
+      my ( $module, $version ) = split /\s/xsm, $line;
+      $modules{$module} = $version;
+
+      return $line;
+    }
+  );
+
+  return \%modules;
+} ## end sub get_requires
+
+sub get_modules {
+  my ($module_list) = @_;
+
+  my ($modules) = process_file( $module_list, chomp => $TRUE );
+
+  return $modules;
+} ## end sub get_modules
+
+# +-------------------------+
+# | MAIN SCRIPT STARTS HERE |
+# +-------------------------+
+
+my %options = ( cleanup => 1 );
+
+GetOptions(
+  \%options,    'abstract|A=s',    'author|a=s', 'buildspec=s',
+  'cleanup!',   'dryrun',          'debug|D',    'exe-files=s',
+  'help=s',     'noversion|n',     'module=s',   'requires|r=s',
+  'scandeps|s', 'test-requires=s', 'verbose|V',  'version|v=s'
+);
+
+if ( $options{'version'} ) {
+  print $PROGRAM_NAME . 'v' . $VERSION . $NL;
+
+  exit $SH_SUCCESS;
+}
+
+if ( $options{buildspec} ) {
+  my %args = parse_buildspec(%options);
+
+  if ( !$options{'dryrun'} ) {
+    exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;
+  }
+  else {
+    print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL;
+  }
+} ## end if ( $options{buildspec...})
+else {
+  write_makefile(%options);
+}
+
+__END__
 
 =pod
 
@@ -27,7 +639,9 @@ make-cpan-spec.pl
 
 =head1 SYNOPSIS
 
- @libexecdir@/make-cpan-spec.pl \
+ make-cpan-spec.pl options
+
+ make-cpan-spec.pl \
    --module Some::Module \
    --author 'Rob Lauer <rlauer6@comcast.net>' \
    --abstract 'my wonderful module'
@@ -37,7 +651,9 @@ make-cpan-spec.pl
 Utility that is part of the toolchain to create a simple CPAN
 distribution. This utility is typically called from the C<bash> helper
 script of the same name or can be passed a build specfication file in
-YAML format.
+YAML format. You may I<not> find this easier to use than crafting your
+own CPAN distirbutions with the various tools available for
+such.
 
 The helper script (F<make-cpan-dist>) does most of the heavy lifting,
 doing things for you like attempting to resolve dependencies and
@@ -61,8 +677,9 @@ F<lib> and some tests in a directory named F<t>, you might try:
 
 Calling this utility directly with the C<-b> option will invoke the
 C<bash> script and is probably the preferred way of using this
-toolchain. If you insist on using this utility directly anyway, read
-on.
+toolchain. The format of the YAML build file is described below.
+
+If you insist on using this utility directly anyway, read on.
 
 =head1 OPTIONS
 
@@ -75,8 +692,43 @@ Name of the module
 =item -b, --buildspec
 
 Name of a build specification file.  The build specification file is
-used B<instead> of options and should be a YAML file that looks
-something like this:
+used B<instead> of options. See L</Build Specificaton Format>.
+
+=item -a, --author
+
+When supplying the author on the command line, include the email
+address in angle brackets as shown in the example.
+
+Example: -a 'Rob Lauer <rlauer6@comcast.net>'
+
+=item -A, --abstract
+
+Short description of the module purpose.
+
+=item -r, --requires
+
+Name of the dependency file list if other than F<requires>.
+
+=item -t, --test-requires
+
+Name of the test dependencies file if other than F<test-requires>.
+
+=item -c, --cleanup
+
+Cleanup temp directories and files.  Default is to cleanup, use
+--no-cleanup if you want to examine some of the temporary files.
+
+=item -v, --version
+
+Returns the version of this script
+
+=back
+
+Note: Set the environment variable C<PRESERVE_MAKEFILE> if you want
+the script to preserve the F<Makefile.PL>.  It will be copied to your
+current working directory.
+
+=head1 Build File Format
 
   project:
     git: https://github.com/rlauer6/perl-Amazon-Credentials
@@ -85,11 +737,32 @@ something like this:
       name: Rob Lauer
       mailto: rlauer6@comcast.net
   pm_module: Amazon::Credentials
+  include-version: no
   dependencies:
     resolver: scandeps
+    path: requires
   path:
+    recurse: yes
     pm_module: src/main/perl/lib
     tests: %src/main/perl/t
+    exe_files: src/main/perl/bin
+  destdir: 
+  extra: extra-files
+  extra-files:
+    -file
+    /usr/local/share/my-project: file
+    /usr/local/share/my-project:
+      -file
+  provides: provides
+  resources:
+    homepage: 'http://github.com/rlauer6/perl-Amazon-API'
+    bugtracker:
+      web: 'http://github.com/rlauer6/perl-Amazon-API/issues'
+      mailto: rlauer6@comcast.net
+    repository:
+      url: 'git://github.com/rlauer6/perl-Amazon-API.git'
+      web: 'http://github.com/rlauer6/perl-Amazon-API'
+      type: 'git'
 
 The sections are described below:
 
@@ -142,15 +815,24 @@ The author's email address.
 
 The name of the Perl module.
 
+=item include-version
+
+If dependencies are resolved automatically include the version
+number. To disable set to no.
+
+default: yes
+
 =item dependencies (optional)
 
 The I<dependencies> section, if present may contain the fully
-qualified path name to a file that contains a list of dependencies. If
+qualified path to a file that contains a list of dependencies. If
 the name of the file is F<cpanfile>, then the file is assumed to be in
 I<cpanfile> format, otherwise the file should be a simple list of Perl
-module names.
+module names optionally followed by a version number.
 
-By default, the scripts will use F</usr/lib/rpm/perl.req> as the
+ Amazon::Credentials 1.15
+
+By default, the scripts will look for F</usr/lib/rpm/perl.req> as the
 dependency resolver, however you can override this by specifying the
 name of program that will produce a list of modules.  If you specify
 the special name I<scandeps>, the scripts will use F<scandeps.pl>.
@@ -177,9 +859,16 @@ a module name.
 The path where the Perl module to be packaged can be found.  By
 default, the current working directory will be searched.
 
+=item recurse (optional)
+
+Specifies whether to or not to looks in subdirectories of path
+specified by C<pm_module> for additional modules to package.  The
+default is 'yes'.  Valid values are "yes" or "no".
+
 =item tests (optional)
 
-The path where tests to be specified in the F<Makefile.PL> will be found.
+The path where tests to be specified in the F<Makefile.PL> will be
+found.
 
 =back
 
@@ -194,15 +883,10 @@ Keys to add to the resources section.  This section is merged into the
 META_MERGE key.  See L<https://metacpan.org/pod/CPAN::Meta::Spec> for
 more details.
 
-=item recurse (optional)
-
-Specifies whether to or not to looks in subdirectories of path
-specified by C<pm_module> for additional modules to pakcages.  The
-default is 'yes'.  Valid values are "yes" or "now".
-
 =item extra (optional)
 
-Name of a file that contains a list of files to be included in the package.
+Name of a file that contains a list of files to be included in the
+package. These files are included in the package but not installed.
 
 =item extra-files (optional)
 
@@ -231,39 +915,6 @@ Path to look for C<.pl> and C<.sh> files to package.
 
 =back
 
-=item -a, --author
-
-When supplying the author on the command line, include the email
-address in angle brackets as shown in the example.
-
-Example: -a 'Rob Lauer <rlauer6@comcast.net>'
-
-=item -A, --abstract
-
-Short description of the module purpose.
-
-=item -r, --requires
-
-Name of the dependency file list if other than F<requires>.
-
-=item -t, --test-requires
-
-Name of the test dependencies file if other than F<test-requires>.
-
-=item -c, --cleanup
-
-Cleanup temp directories and files.  Default is to cleanup, use
---no-cleanup if you want to examine some of the temporary files.
-
-=item -v, --version
-
-Returns the version of this script
-
-=back
-
-Note: Set the environment variable C<PRESERVE_MAKEFILE> if you want
-the script to preserver the F<Makefile.PL>.  It will be copied to your
-current working directory.
 
 =head1 DEPENDENCIES
 
@@ -295,444 +946,3 @@ Example:
 Rob Lauer - <rlauer6@comcast.net>
 
 =cut
-
-sub get_requires {
-  my $requires = shift;
-  
-  open my $fh, '<', $requires
-    or croak "Could not get pre-requisites ($requires)\n";
-
-  my %modules;
-  
-  while (my $line = <$fh>) {
-    chomp $line;
-    my ($module, $version) = split /\s/, $line;
-    $modules{$module} = $version;
-  }
-  
-  close $fh;
-  
-  return \%modules;
-}
-
-sub get_modules {
-  my $module_list = shift;
-  
-  my @modules;
-  
-  open my $fh, '<', $module_list
-    or croak "Could not open module list\n";
-  
-  while (my $line = <$fh>) {
-    chomp $line;
-    push @modules, $line;
-  }
-  
-  close $fh;
-  
-  return \@modules;
-}
-
-sub help {
-  print <<eot;
-usage: $0 OPTIONS
-
-Example: $0 -m Some::Module -a 'Rob Lauer <rlauer6\@comcast.net>' -d 'my wonderful module'
-
-OPTIONS
--------
--c, --cleanup         cleanup files, this is default
-                      use --no-cleanup to prevent cleanup
--a, --author          author
--A, --any             do not require a version
--b, --buildspec       read a buildspec and create command line
--d, --abstract        abstract
--m, --module          module name
--M, --module-list     list of modules to include in distribution
--n, --noversion       do not include versions
--r, --requires        dependency list
--t, --test-requires   test dependencies
--s, --scandeps        use scandeps for dependency checking
--v, --version         version
-
-Typically, this script is called from the bash helper script of the same
-name (make-cpan-dist) or is invoked with a YAML file that specifies
-the parmeters used to build a distribution.
-
-See https://github.com/rlauer6/make-cpan-dist.git for more documentation.
-
-See man make-cpan-dist
-
-eot
-}
-
-my %options = (cleanup => 1 );
-
-GetOptions(\%options,
-           "abstract|A=s",
-           "author|a=s",
-           "buildspec=s",
-           "cleanup!",
-           "dryrun",
-           "debug|D",
-           "exe-files=s",
-           "help=s",
-           "noversion|n",
-           "module=s",
-           "requires|r=s",
-           "scandeps|s",
-           "test-requires=s",
-           "verbose|V",
-           "version|v=s"
-          );
-
-if ( $options{version} ) {
-  print "make-cpan-dist.pl v$VERSION\n";
-  exit;
-}
-
-if ( $options{buildspec} ) {
-  croak 'file not found or empty ' . $options{buildspec} . "\n"
-    if ! -s $options{buildspec};
-  
-  my $buildspec = eval {
-    LoadFile($options{buildspec});
-  };
-  
-  croak 'could not read ' . $options{buildspec} . "\n$EVAL_ERROR\n"
-    if $EVAL_ERROR;
-
-  #version: 0.1
-  #
-  #project:
-  #  git: https://github.com/rlauer6/perl-Amazon-Credentials
-  #  description: "AWS credentials discoverer"
-  #  author:
-  #    name: Rob Lauer
-  #    mailto: rlauer6@comcast.net
-  #pm_module: Amazon::Credentials
-  #path:
-  #  pm_module: src/main/perl/lib
-  #  tests: %src/main/perl/t
-  #  extra: extra-files
-  #  extra-files:
-  #    ../ChangeLog
-  #destdir: directory for output
-  
-  my %args;
-  
-  # -m 
-  if ( $buildspec->{pm_module} ) {
-    $args{m} = $buildspec->{pm_module};
-  }
-  
-  if ( defined $buildspec->{'include-version'} ) {
-    if ( $buildspec->{'include-version'} =~/^(no|0|off)$/ ) {
-      $args{A} = '';
-    }
-  }
-  
-  if ( $buildspec->{project} ) {
-    # -a 
-    if ( $buildspec->{project}->{author} ) {
-      $args{a} = $buildspec->{project}->{author}->{name};
-      $args{a} .= " <" . $buildspec->{project}->{author}->{mailto} . ">"
-        if $buildspec->{project}->{author}->{mailto};
-      
-      $args{a} = sprintf("'%s'", $args{a});
-    }
-    
-    # -d
-    $args{d} = sprintf("'%s'", $buildspec->{project}->{description}) 
-      if $buildspec->{project}->{description};
-    
-    # -g
-    $args{g} = $buildspec->{project}->{git} 
-      if $buildspec->{project}->{git};
-  }
-
-  # dependencies:
-  #   resolver:
-  #   path:
-  if ( $buildspec->{dependencies} ) {
-    if ( $buildspec->{dependencies}->{path} ) {
-      $args{D} = $buildspec->{dependencies}->{path};
-    }
-    
-    if ( my $resolver = $buildspec->{dependencies}->{resolver} ) {
-      if ( $resolver eq 'scandeps' ) {
-        $args{s} = '';
-      }
-      else {
-        $args{r} = $buildspec->{dependencies}->{resolver};
-      }
-    }
-    
-    if ( $args{D} && $args{r} ) {
-      croak "use either path or resolver for dependencies, but not both\n";
-    }
-  }
-
-  # the default if not provided in the bash script is always YES!
-  if ( $buildspec->{path} ) {
-    if ( $buildspec->{path}->{recurse} && $buildspec->{path}->{recurse} =~/(yes|no)/ ) {
-      $args{R} = $buildspec->{path}->{recurse};
-    }
-    elsif ($buildspec->{path}->{recurse}) {
-      croak "use only yes or no for 'recurse' option\n";
-    }
-    
-    # -l
-    $args{l}= $buildspec->{path}->{pm_module}
-      if $buildspec->{path}->{pm_module};
-
-    # -e
-    $args{e}= $buildspec->{path}->{exe_files}
-      if $buildspec->{path}->{exe_files};
-    
-    # -t
-    $args{t}= $buildspec->{path}->{tests}
-      if $buildspec->{path}->{tests};
-  }
-  
-  foreach (keys %args) {
-    $args{"-$_"} = $args{$_};
-    delete $args{$_};
-  }
-  
-  $args{'-v'} = ''
-    if $options{verbose};
-
-  $args{'-o'} = $buildspec->{destdir}
-    if $buildspec->{destdir};
-
-  $args{'-x'} = ''
-    if ! $options{'cleanup'};
-
-  # filename specified 
-  if ( $buildspec->{extra} ) {
-    $args{'-f'} = $buildspec->{extra};
-  }
-  
-  # scandeps
-  $args{'-s'} = ''
-    if $options{scandeps};
-
-  $args{'-A'} = ''
-    if $options{noversion};
-
-  if ( $buildspec->{'extra-files'} && reftype($buildspec->{'extra-files'}) eq 'ARRAY' ) {
-    my $extra_files = $buildspec->{extra} || 'extra-files';
-    
-    open (my $fh, ">$extra_files") or
-      croak "could not append to $extra_files\n";
-    
-    foreach my $e (@{$buildspec->{'extra-files'}}) {
-      
-      if ( !ref($e) ) {
-        print $fh "$e \n";
-      }
-      elsif ( reftype($e) eq 'HASH' ) {
-        my ($destdir) = keys %{$e};
-        
-        $destdir .= '/'
-          if !$destdir =~/\/$/;
-        
-        my $file_list = $e;
-        
-        if ( ref($file_list) && reftype($file_list) ne 'ARRAY') {
-          $file_list = [ values %{$file_list} ];
-        }
-        elsif (!ref $file_list) {
-          $file_list = [ $file_list ];
-        }
-
-        for my $f (@{$file_list}) {
-          if ( -d $f ) {
-            find(sub {
-                   if ( $_ !~/^\.\.?$/ ) {
-                     print $fh "$File::Find::name $destdir/$_\n";
-                   }
-                 }, $f);
-          }
-          else {
-            my ($name, $path, $ext) = fileparse($f, qr/\.[^.]*/);
-            print $fh "$f $destdir/$name$ext\n";
-          }
-        }
-      }
-    }
-    
-    close $fh;
-    $args{'-f'} = "$extra_files";
-  }
-  
-  if ( $buildspec->{provides} ) {
-    open (my $fh, ">provides");
-    
-    foreach (@{$buildspec->{provides}}) {
-      print $fh "$_\n";
-    }
-    
-    close $fh;
-    $args{'-P'} = 'provides';
-  }
-
-  if ( $buildspec->{resources} ) {
-    open my $fh, '>', 'resources'
-      or croak "could not open resources for writing\n";
-    
-    print $fh encode_json($buildspec->{'resources'});
-    
-    close $fh;
-  }
-  
-  if ( !$options{dryrun} ) {
-    exec '@bindir@/make-cpan-dist ' . join(" ", %args);
-  }
-  else {
-    print  '@bindir@/make-cpan-dist ' . join(" ", %args) . "\n";
-    exit 0;
-  }
-}
-
-my $module=$options{module};
-my $author = $options{author} || 'Anonyous <anonymous@example.com>';
-my $abstract = $options{abstract} || 'my awesome Perl module!';
-
-if ( $options{help} || ! ($module && $author && $abstract) ) {
-  help;
-  exit;
-}
-
-croak "no dependencies\n"
-  if ! $options{requires};
-
-while ($module =~s/::/\//g) {}
-$module = 'lib/' . $module . '.pm';
-
-$Data::Dumper::Terse = 1;
-$Data::Dumper::Sortkeys = 1;
-$Data::Dumper::Indent = 2;
-$Data::Dumper::Pad = ' '  x 4;
-
-$options{requires} = $options{requires} || 'requires';
-$options{'test-requires'} = $options{'test-requires'} || 'test-requires';
-
-my $pre_req =  Dumper get_requires($options{requires});
-$pre_req =~s/^\s*(.*?)$/$1/m;
-    chomp $pre_req;
-    
-my $test_req = {};
-
-if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
-  $test_req = Dumper get_requires($options{'test-requires'});
-  $test_req =~s/^\s*(.*?)$/$1/m;
-}
-else {
-  $test_req = Dumper $test_req;
-}
-
-my @exe_file_list;
-
-if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
-  open (my $fh, '<' . $options{'exe-files'})
-    or croak "could not open " . $options{'exe-files'} . "\n";
-  
-  while (<$fh>) {
-    chomp;
-    s/^.*\/(.*)$/bin\/$1/;
-    push @exe_file_list, $_;
-  };
-  close $fh;
-}
-
-my $exe_files = Dumper \@exe_file_list;
-
-my $META_MERGE;
-
-if ( -e "provides" || -e "resources" ) {
-
-  open my $fh, '<', 'provides'
-    or croak "could not open provides\n";
-
-  my %provides;
-  
-  while (my $module = <$fh>) {
-    chomp $module;
-    
-    my $file = join("/", split /::/, $module) . '.pm';
-    my $version;
-    
-    {
-      require $file;
-      $version = eval "\$${module}::VERSION";
-    }
-    
-    $provides{$module} = { file => "lib/$file", version => "$version" };
-  }
-  
-  close $fh;
-
-  my $resources;
-  
-  if ( -e 'resources' ) {
-    open my $fh, '<', 'resources'
-      or croak "could not open resources\n";
-    
-    local $RS;
-    $resources = <$fh>;
-    $resources = decode_json($resources);
-
-    close $fh;
-  }
-
-  {
-    $Data::Dumper::Pair = '=>';
-    $META_MERGE         = "META_MERGE => "
-      . Dumper(
-      { "meta-spec" => { version => 2 },
-        "provides"  => \%provides,
-        $resources ? ( "resources" => $resources ) : ()
-      }
-      );
-  }
-  
-  print STDERR $META_MERGE
-    if $options{debug};
-}
-
-my $MAKEFILE = <<eot;
-
-use strict;
-use warnings;
-
-use ExtUtils::MakeMaker;
-use File::ShareDir::Install;
-
-if ( -d 'share' ) {
-  install_share 'share';
-}
-
-WriteMakefile(
-    NAME           => '$options{module}',
-    AUTHOR         => '$author',
-    VERSION_FROM   => '$module',
-    ABSTRACT       => '$abstract',
-    LICENSE        => 'perl',
-    PL_FILES       => {},
-    EXE_FILES      => $exe_files,
-    PREREQ_PM      => $pre_req,
-    TEST_REQUIRES  => $test_req,
-    $META_MERGE
-);
-
-package MY;
-
-use File::ShareDir::Install qw( postamble );
-
-eot
-
-print STDERR $MAKEFILE;
-print $MAKEFILE;
-

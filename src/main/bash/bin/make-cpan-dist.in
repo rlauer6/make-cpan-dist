@@ -41,6 +41,32 @@ EOT
     exit;
 }
 
+function DEBUG {
+    test -n "$DEBUG" && 2>&1 echo "$1"
+}
+
+function ERROR {
+    2>&1 echo "ERROR: $1"
+}
+
+function ERROR {
+    2>&1 echo "WARN: $1"
+}
+
+function FATAL_ERROR {
+    ERROR "$1"
+    
+    exit "${2:-1}"
+}
+
+function INFO {
+    2>&1 echo "INFO: $1"
+}
+
+function module2path {
+    echo "$(echo $1 | perl -npe 's/::/\//g').pm"
+}
+
 # look for project home directory from here back, sets PROJECT_HOME
 function find_git_home {
     project_home="..";
@@ -84,9 +110,8 @@ function perl_requires {
     if test -n "@PERL_REQUIRES@"; then
         /usr/lib/rpm/perl.req "$1" | perl -npe 's/^perl\((.*)\)/$1/'
     else
-        >&2 echo "ERROR: no /usr/lib/rpm/perl.req found!"
-        >&2 echo "Install rpm-build package or use the -r option to provide your own dependency checker"
-        exit 1;
+        ERROR "no /usr/lib/rpm/perl.req found!"
+        FATAL_ERROR "Install rpm-build package or use the -r option to provide your own dependency checker"
     fi
 }
 
@@ -95,7 +120,7 @@ function get_module_versions {
     infile="$1"
     
     if ! test -e "$infile"; then
-        echo "file $infile not found!"
+        ERROR "file $infile not found!"
         return;
     fi
 
@@ -127,14 +152,13 @@ function scan() {
     
     if [ "$PERL_REQUIRES" = "SCANDEPS" ]; then
         if test -z "@scandeps@"; then
-            >&2 echo "no scandeps.pl found!"
+            FATA_ERROR "no scandeps.pl found!"
             exit 1
         else
             set -o pipefail
-            >&2 echo "Scanning $scan_target..."
+            INFO "Scanning (@scandeps@) $scan_target..."
             if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" | awk '{print $1}' >> ${workdir}/requires.tmp; then
-                >&2 echo "ERROR: could not resolve dependencies for $scan_target"
-                exit 1;
+                FATAL_ERROR "could not resolve dependencies for $scan_target"
             else
                 if test -n "$DEBUG"; then
                     cat ${workdir}/requires.tmp
@@ -151,7 +175,7 @@ function scan() {
 # +--------------------+
 
 while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:" arg "$@"; do
-    
+
     case "${arg}" in
 
         A)
@@ -290,20 +314,20 @@ builddir=$(mktemp -d)
 
 trap cleanup EXIT
 
-module_file="$(echo "$MODULE" | perl -npe "s/::/\//g").pm"
+module_file="$(module2path $MODULE)"
 
 mkdir -p ${builddir}/lib/$(dirname $module_file);
     
 if ! test -e "${PROJECT_HOME}/${perl5libdir}/$module_file"; then
-    echo "no "${PROJECT_HOME}/${perl5libdir}/$module_file" found!"
-    exit;
+    FATAL_ERROR "no "${PROJECT_HOME}/${perl5libdir}/$module_file" found!"
 fi
 
 if test -n "$EXTRA"; then
     if test -s "$EXTRA"; then
         while IFS=' ' read -r a b
         do
-            echo "$a $b"
+            INFO "$a $b"
+            
             if [ -f "$a" ]; then
                 if test -n "$b"; then
                    dir=$(dirname $b)
@@ -311,12 +335,12 @@ if test -n "$EXTRA"; then
                 fi
                 cp $a $builddir/$dir
             else
-                echo "file [$a] not found?"
+                ERROR "file [$a] not found?"
                 exit 1
             fi
         done <"$EXTRA"
     else
-        echo "No EXTRA file ($EXTRA) found in $(pwd)!"
+        WARN "No EXTRA file ($EXTRA) found in $(pwd)!"
     fi
 fi
 
@@ -340,21 +364,23 @@ if [ "$recurse_directories" = "yes" ]; then
 else
     if test -n "$provides"; then
         if test -s "$provides"; then
-            echo "$MODULE.pm" >>$provides
-            for a in $(cat $provides) "$MODULE.pm"; do
-                echo "${PROJECT_HOME}/${perl5libdir}/$a" >> $package_files
+            echo "$MODULE" >>$provides
+            for a in $(cat $provides) "$module_file"; do
+                echo "${PROJECT_HOME}/${perl5libdir}/$(module2path $a)" >> $package_files
             done
 
         else
-            echo "empty provides file"
-            exit 1;
+            FATAL_ERROR "Empty provides file"
         fi
     else
-        find ${PROJECT_HOME}/${perl5libdir} $maxdepth -name '*.pm' > $package_files;
+        # must package the module at least?
+        echo "${PROJECT_HOME}/${perl5libdir}/$module_file" >$package_files
     fi
 fi
 
 for a in $(cat $package_files | sort -u); do
+    DEBUG "packaging file: $a"
+    
     required_module=${a##${PROJECT_HOME}/${perl5libdir}/}
     echo $required_module >> ${workdir}/provides.tmp
     mkdir -p $(dirname ${builddir}/lib/$required_module)
@@ -386,7 +412,7 @@ else
         if test -n $(which cpanfile-dump 2>/dev/null); then
             cpanfile-dump "$dependency_file" >${workdir}/requires.tmp
         else
-            echo "WARNING: cpanfile-dump not found!"
+            WARN "cpanfile-dump not found!"
         fi
     else
         cat $dependency_file > ${workdir}/requires.tmp
@@ -394,7 +420,7 @@ else
 fi
 
 if ! test -s ${workdir}/requires.tmp; then
-    (>&2 echo "WARNING: no dependencies will be listed for this distribution!")
+    WARN "no dependencies will be listed for this distribution!"
     touch ${workdir}/requires.tmp
 fi
 
@@ -453,7 +479,7 @@ PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
 
 # if that was successful, then try to build the distribution
 if ! test -e $builddir/Makefile.PL; then
-    echo "failed to build Makefile.PL"
+    FATAL_ERROR "failed to build Makefile.PL"
     exit;
 else
     cd $builddir
@@ -466,6 +492,6 @@ else
         cp *.tar.gz $destdir
         make test
         test -n "$PRESERVE_MAKEFILE" && cp Makefile.PL $destdir
-        echo "CPAN authors: cpan-upload-http $(ls -1rt *.tar.gz | tail -1)"
+        INFO "CPAN authors: cpan-upload-http $(ls -1rt *.tar.gz | tail -1)"
     fi
 fi

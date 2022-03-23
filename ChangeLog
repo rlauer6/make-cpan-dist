@@ -1,3 +1,20 @@
+Wed Mar 23 09:43:31 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.0 - refactor]:
+	* configure.ac: bump version
+	* src/main/bash/bin/make-cpan-dist.in
+	- added DEBUG,INFO,WARN,ERROR,FATAL_ERROR logging
+	- output full path to $package_files
+	- output full path of main module to $package_files
+	(module2path): new
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- pod corrections
+	- replace YAM::Syck with YAML::Tiny
+	- use ExtUtils::MM for version detection
+	- perlcritic mitigations (major refactoring)
+	* src/main/perl/lib/File/Process.pm.in: new
+	* src/main/perl/lib/Makefile.am: add above to build
+
 Mon Feb 28 14:42:22 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.4.1]:
