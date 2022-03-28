@@ -1,3 +1,44 @@
+Mon Mar 28 17:14:10 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.1 - File::Process]:
+	* src/main/perl/lib/t/00-file-process.t: new
+	* src/main/perl/lib/t/01-filter.t: new
+	* src/main/perl/lib/t/02-process.t: new
+	* src/main/perl/lib/t/03-process-pre.t: new
+	* src/main/perl/lib/File/Process.pm.in
+	- bump version
+	- export all default processors (except process_file)
+	- move all in-line subs to subs
+	- added filter processor
+	- perlcritic updates
+	- croak on errors after call to process
+	(_filter): new
+	(_pre): new
+	(_post): new
+	(_process): new
+	(_next_line): new
+	* src/main/bash/bin/upload2cpan.in: new
+	* src/main/bash/bin/Makefile.am
+	- add above to build
+	* src/main/bash/bin/make-cpan-dist.in
+	- added log-level
+	- added logging functions
+	- scan to output file
+	- output module versions for test
+	- check success/failure of make-cpan-dist.pl
+	(get_module_versions): use eval to report version
+	(scan): add for output file
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- add log-level, work-dir options
+	- use Log::Log4perl
+	- add BUILD_REQUIRES
+	- add CONFIGURE_REQUIRES
+	- use pod2usage for help
+	- pod tweaks
+	(get_provides)
+	- add version from packaged file
+	(parse_buildspec): support --no-cleanup type options
+
 Wed Mar 23 09:43:31 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.0 - refactor]:

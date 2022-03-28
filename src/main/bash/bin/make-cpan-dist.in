@@ -21,6 +21,7 @@ Options
 -h             - help
 -f file        - file containing a list of extra files to include
 -l path        - path to Perl modules
+-L log level   - logging level 1=error, 5=trace
 -m name        - module name
 -o dir         - output directory (default: current directory)
 -p             - preserve Makefile.PL
@@ -32,7 +33,10 @@ Options
 -v             - more verbose output
 -x             - do not cleanup files
 
-NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment variables.
+* NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment
+  variables.
+
+* use -L for logging level or DEBUG=1 (debug), DEBUG=2 (trace)
 
 This script is free software. It may be used, redistributed and/or
 modified under the same terms as Perl itself.
@@ -41,26 +45,31 @@ EOT
     exit;
 }
 
-function DEBUG {
-    test -n "$DEBUG" && 2>&1 echo "$1"
-}
-
-function ERROR {
-    2>&1 echo "ERROR: $1"
-}
-
-function ERROR {
-    2>&1 echo "WARN: $1"
-}
-
 function FATAL_ERROR {
     ERROR "$1"
     
     exit "${2:-1}"
 }
 
+function ERROR {
+    [ "$LOG_LEVEL" -ge 1 ] && 2>&1 echo "ERROR: $1" && return
+}
+
 function INFO {
-    2>&1 echo "INFO: $1"
+    [ "$LOG_LEVEL" -ge 2 ] && 2>&1 echo "INFO: $1" && return
+}
+
+function WARN {
+    [ "$LOG_LEVEL" -ge 3 ] && 2>&1 echo "WARN: $1" && return
+}
+
+function DEBUG {
+    echo "LOG_LEVEL: $LOG_LEVEL"
+    [ $LOG_LEVEL -ge 4 ] && 2>&1 echo "DEBUG: $1" && return
+}
+
+function TRACE {
+    [ "$LOG_LEVEL" -ge 5 ] && 2>&1 echo "TRACE: $1" && return
 }
 
 function module2path {
@@ -89,8 +98,8 @@ function find_git_home {
 
 # cleanup on exit
 function cleanup {
-
     test -n "$NOCLEANUP" && return;
+    
     test -n "$testsfile" && rm "$testsfile"
     test -n "$tmp_gitdir" && rm -rf "$tmp_gitdir"
     test -n "$package_files" && rm "$package_files"
@@ -135,9 +144,8 @@ function get_module_versions {
 	if test -n "$ANY_VERSION"; then
 	    echo "$module 0"
 	elif test -n "$a" && ! test -n "$version"; then
-	    @perlenv@ -I ${perl5libdir} \
-	     -M$a \
-	     -e 'print "'$module'"," ", $'$module'::VERSION,"\n";' || echo "$module 0" || true;
+	    echo $module | @perlenv@ -I ${perl5libdir} \
+            -ne 'chomp; $m=$_; eval "require $m"; $v = eval "\$${m}::VERSION"; print "$m ",$v||0,"\n";' || true;
 	else
 	    echo "$module $version";
 	fi
@@ -149,6 +157,7 @@ function get_module_versions {
 
 function scan() {
     scan_target="$1";
+    requires_file="$2";
     
     if [ "$PERL_REQUIRES" = "SCANDEPS" ]; then
         if test -z "@scandeps@"; then
@@ -157,16 +166,15 @@ function scan() {
         else
             set -o pipefail
             INFO "Scanning (@scandeps@) $scan_target..."
-            if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" | awk '{print $1}' >> ${workdir}/requires.tmp; then
+            if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" | awk '{print $1}' >> $requires_files; then
                 FATAL_ERROR "could not resolve dependencies for $scan_target"
             else
-                if test -n "$DEBUG"; then
-                    cat ${workdir}/requires.tmp
-                fi
+                DEBUG $(echo "SCAN:" && cat $requires_file)
             fi
         fi
     else
-        $PERL_REQUIRES $scan_target >> ${workdir}/requires.tmp
+        $PERL_REQUIRES $scan_target >> $requires_file
+        DEBUG $(echo "SCAN:" && cat $requires_file)
     fi
 }
 
@@ -174,7 +182,7 @@ function scan() {
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:" arg "$@"; do
+while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:" arg "$@"; do
 
     case "${arg}" in
 
@@ -258,6 +266,10 @@ while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:" arg "$@"; do
             perl5libdir="$OPTARG";
             ;;
 
+        L)
+            LOG_LEVEL="$OPTARG";
+            ;;
+        
         r)
             PERL_REQUIRES="$OPTARG";
             ;;
@@ -268,7 +280,22 @@ while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:" arg "$@"; do
     esac
 done
 
-test -n "$DEBUG" && set -x
+if test -n "$DEBUG"; then
+    if [ "$DEBUG" = "1" ]; then
+        LOG_LEVEL=4
+    elif [ "$DEBUG" = "2" ]; then
+        LOG_LEVEL=5
+    fi
+fi     
+
+LOG_LEVEL=${LOG_LEVEL:-1};
+re='^[0-9]+$'
+
+if ! [[ $LOG_LEVEL =~ $re ]] ; then
+   FATAL_ERROR "$LOG_LEVEL must be a number between 1 and 5"
+fi
+
+[ "$LOG_LEVEL" -ge 4 ] && set -x
 
 shift $((OPTIND -1))
 
@@ -379,14 +406,15 @@ else
 fi
 
 for a in $(cat $package_files | sort -u); do
-    DEBUG "packaging file: $a"
+    DEBUG "provides: [$a]"
     
     required_module=${a##${PROJECT_HOME}/${perl5libdir}/}
     echo $required_module >> ${workdir}/provides.tmp
+    
     mkdir -p $(dirname ${builddir}/lib/$required_module)
     cp $a ${builddir}/lib/$required_module
 done
-    
+
 if test -s "$exe_files"; then
     mkdir -p ${builddir}/bin
     
@@ -398,13 +426,13 @@ fi
 if test -z "$dependency_file"; then
 
     for a in $(cat $package_files | sort -u); do
-        scan $a;
+        scan $a ${workdir}/requires.tmp;
     done
     
     # find dependencies for .pl files
     if test -s "$exe_files"; then
         for a in $(cat $exe_files); do
-            scan $a;
+            scan $a ${workdir}/requires.tmp;
         done
     fi
 else
@@ -425,6 +453,10 @@ if ! test -s ${workdir}/requires.tmp; then
 fi
 
 cat ${workdir}/provides.tmp | perl -npe 's/\//::/g; s/\.pm$//;' | sort -u > ${workdir}/provides
+
+# should we resolve versions here or in Perl module?
+# echo "$(get_module_versions ${workdir}/provides)" > ${workdir}/provides
+
 sort -u ${workdir}/requires.tmp > ${workdir}/requires
 
 # remove provided files from required list
@@ -449,13 +481,13 @@ else
                 
                 for a in $(cat $testsfile); do
                     cp $PROJECT_HOME/$a ${builddir}/t/
-                    scan $PROJECT_HOME/$a >> ${workdir}/test-requires.tmp
+                    scan $PROJECT_HOME/$a ${workdir}/test-requires.tmp
                 done
                 
-                # remove provided files from required lis`t
+                # remove provided files from required list
                 sort -u ${workdir}/test-requires.tmp > ${workdir}/test-requires
-                comm -23 ${workdir}/test-requires  ${workdir}/provides > ${workdir}/test-requires.tmp
-                
+                comm -23 ${workdir}/test-requires ${workdir}/provides > ${workdir}/test-requires.tmp
+                # get module versions for test-requires
                 get_module_versions test-requires.tmp > ${workdir}/test-requires
             else
                 rm -f "$testsfile";
@@ -469,13 +501,18 @@ test -n "$VERBOSE" && cat ${workdir}/requires
 test -n "$VERBOSE" && test -e ${workdir}/test-requires && cat ${workdir}/test-requires
 
 # create the Makefile.PL
-PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
+if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             -r ${workdir}/requires \
             -e $exe_files \
             -t ${workdir}/test-requires \
+            -w ${builddir} \
+            -l $LOG_LEVEL \
             -m "$MODULE" \
             -A "$description" \
-            -a "$author" > $builddir/Makefile.PL
+            -a "$author" > $builddir/Makefile.PL; then
+    ERROR "could not successfully create Makefile.PL"
+    exit 1
+fi
 
 # if that was successful, then try to build the distribution
 if ! test -e $builddir/Makefile.PL; then

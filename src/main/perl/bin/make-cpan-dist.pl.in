@@ -8,17 +8,21 @@ use warnings;
 use Carp;
 use Data::Dumper;
 use English qw{ -no_match_vars };
-use Getopt::Long qw{:config no_ignore_case };
 use ExtUtils::MM;
-use File::Find;
 use File::Basename;
-use File::Temp qw{ :POSIX };
+use File::Find;
 use File::Process qw{ process_file };
-use List::Util qw{ pairs };
+use File::Temp qw{ :POSIX };
+use Getopt::Long qw{:config no_ignore_case };
 use JSON::PP qw{ encode_json decode_json };
-use YAML::Tiny;
-use Scalar::Util qw{ reftype };
+use List::Util qw{ pairs };
+use Log::Log4perl qw{ :easy };
+use Log::Log4perl::Level;
+
+use Pod::Usage;
 use ReadonlyX;
+use Scalar::Util qw{ reftype };
+use YAML::Tiny;
 
 Readonly my $TRUE         => 1;
 Readonly my $FALSE        => 1;
@@ -51,6 +55,7 @@ OPTIONS
 -A, --any             do not require a version
 -b, --buildspec       read a buildspec and create command line
 -d, --abstract        abstract
+-l, --log-level       ERROR, WARN, INFO, DEBUG, TRACE
 -m, --module          module name
 -M, --module-list     list of modules to include in distribution
 -n, --noversion       do not include versions
@@ -100,7 +105,7 @@ sub make_path_from_module {
 } ## end sub make_path_from_module
 
 sub get_provides {
-  my ($file) = @_;
+  my ( $file, %options ) = @_;
 
   my %provides;
 
@@ -109,22 +114,35 @@ sub get_provides {
       $file,
       chomp            => $TRUE,
       skip_blank_lines => $TRUE,
-      prefix           => '/usr/local/share/perl5',
+      prefix           => 'lib',
       process          => sub {
-        my $provided_module = pop @_;
-        my $args            = pop @_;
+        my $module = pop @_;
+        my $args   = pop @_;
 
-        if ( !$provided_module ) {
+        if ( !$module ) {
           return ();
         }
 
-        my $path = make_path_from_module($provided_module);
-        $path = $args->{'prefix'} . $SLASH . $path;
+        my ( $provided_module, $version ) = split /\s+/xsm, $module;
 
-        my $version = eval { return ExtUtils::MM->parse_version($path); };
+        my $file = make_path_from_module($provided_module);
+        my $path = $args->{'prefix'} . $SLASH . $file;
+
+        if ( $options{'work-dir'} ) {
+          $path = $options{'work-dir'} . '/' . $path;
+        }
+
+        if ( -e $path ) {
+          if ( !$version ) {
+            $version = eval { return ExtUtils::MM->parse_version($path); };
+          }
+        }
+        else {
+          croak "could not find $path\n";
+        }
 
         $provides{$provided_module} = {
-          file    => $path,
+          file    => $args->{prefix} . '/' . $file,
           version => $version // 0,
         };
 
@@ -247,7 +265,7 @@ sub write_makefile {
   my %provides;
 
   if ( -e 'provides' ) {
-    %provides = get_provides('provides');
+    %provides = get_provides( 'provides', %options );
   }
 
   my $resources;
@@ -282,16 +300,24 @@ if ( -d 'share' ) {
 }
 
 WriteMakefile(
-    NAME           => '$options{module}',
-    AUTHOR         => '$author',
-    VERSION_FROM   => '$module',
-    ABSTRACT       => '$module_abstract',
-    LICENSE        => 'perl',
-    PL_FILES       => {},
-    EXE_FILES      => $exe_files,
-    PREREQ_PM      => $pre_req,
-    TEST_REQUIRES  => $test_req,
-    $META_MERGE
+  NAME           => '$options{module}',
+  AUTHOR         => '$author',
+  VERSION_FROM   => '$module',
+  ABSTRACT       => '$module_abstract',
+  LICENSE        => 'perl',
+  PL_FILES       => {},
+  EXE_FILES      => $exe_files,
+  PREREQ_PM      => $pre_req,
+  BUILD_REQUIRES => {
+    'ExtUtils::MakeMaker'     => 0,
+    'File::ShareDir::Install' => 0,
+    },
+  CONFIGURE_REQUIRES => {
+    'ExtUtils::MakeMaker'     => 0,
+    'File::ShareDir::Install' => 0,
+    },
+  TEST_REQUIRES => $test_req,
+  $META_MERGE
 );
 
 package MY;
@@ -300,11 +326,9 @@ use File::ShareDir::Install qw( postamble );
 
 END_OF_TEXT
 
-  if ( $options{'debug'} ) {
-    print {*STDERR} $MAKEFILE;
-  }
-
   print $MAKEFILE;
+
+  DEBUG sub { return $MAKEFILE };
 
   return $SH_SUCCESS;
 } ## end sub write_makefile
@@ -541,12 +565,17 @@ sub parse_buildspec {
 
   # set boolean args from options
 
-  my @boolean_args = qw{ verbose v cleanup x scandeps s noversion A };
+  my @boolean_args = qw{ verbose v cleanup !x scandeps s noversion A };
 
   foreach my $pair ( pairs @boolean_args ) {
     my ( $key, $value ) = @{$pair};
 
-    if ( $options{$key} ) {
+    if ( $value =~ /^\!(.*)$/xsm ) {
+      if ( $options{$1} ) {
+        delete $options{$1};
+      }
+    }
+    elsif ( $options{$key} ) {
       $args{$value} = $EMPTY;
     }
   } ## end foreach my $pair ( pairs @boolean_args)
@@ -603,11 +632,18 @@ sub get_modules {
 my %options = ( cleanup => 1 );
 
 GetOptions(
-  \%options,    'abstract|A=s',    'author|a=s', 'buildspec=s',
-  'cleanup!',   'dryrun',          'debug|D',    'exe-files=s',
-  'help=s',     'noversion|n',     'module=s',   'requires|r=s',
-  'scandeps|s', 'test-requires=s', 'verbose|V',  'version|v=s'
+  \%options,       'abstract|A=s',    'author|a=s', 'buildspec=s',
+  'cleanup!',      'dryrun',          'debug|D',    'exe-files=s',
+  'help|h',        'noversion|n',     'module=s',   'requires|r=s',
+  'scandeps|s',    'test-requires=s', 'verbose|V',  'version|v=s',
+  'log-level|l=s', 'work-dir|w=s'
 );
+
+print STDERR Dumper \%options;
+
+if ( $options{help} ) {
+  pod2usage(1);
+}
 
 if ( $options{'version'} ) {
   print $PROGRAM_NAME . 'v' . $VERSION . $NL;
@@ -615,8 +651,41 @@ if ( $options{'version'} ) {
   exit $SH_SUCCESS;
 }
 
+my $log_level = $options{'log-level'};
+
+if ($log_level) {
+  if ( $log_level =~ /^[1-5]$/ ) {
+    $log_level = ( $ERROR, $WARN, $INFO, $DEBUG, $TRACE )[ $log_level - 1 ];
+  }
+  else {
+    $log_level = {
+      ERROR => $ERROR,
+      WARN  => $WARN,
+      INFO  => $INFO,
+      DEBUG => $DEBUG,
+      TRACE => $TRACE,
+    }->{ uc $options{'log-level'} };
+  } ## end else [ if ( $log_level =~ /^[1-5]$/)]
+
+  if ( !$log_level ) {
+    $log_level = $ERROR;
+  }
+
+  Log::Log4perl->easy_init($log_level);
+} ## end if ($log_level)
+
 if ( $options{buildspec} ) {
   my %args = parse_buildspec(%options);
+
+  if ($log_level) {
+    $args{'-L'} = {
+      $ERROR => 1,
+      $WARN  => 2,
+      $INFO  => 3,
+      $DEBUG => 4,
+      $TRACE => 5,
+    }->{$log_level};
+  } ## end if ($log_level)
 
   if ( !$options{'dryrun'} ) {
     exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;
@@ -639,9 +708,9 @@ make-cpan-spec.pl
 
 =head1 SYNOPSIS
 
- make-cpan-spec.pl options
+ make-cpan-dist.pl options
 
- make-cpan-spec.pl \
+ make-cpan-dist.pl \
    --module Some::Module \
    --author 'Rob Lauer <rlauer6@comcast.net>' \
    --abstract 'my wonderful module'
@@ -744,7 +813,7 @@ current working directory.
   path:
     recurse: yes
     pm_module: src/main/perl/lib
-    tests: %src/main/perl/t
+    tests: src/main/perl/t
     exe_files: src/main/perl/bin
   destdir: 
   extra: extra-files
@@ -926,7 +995,7 @@ creation of the distribution.
 You can specify a different name for the files with the C<-r> and
 C<-t> options.
 
- B<You must however have a filed that contains the dependency list.>
+ B<You must however have a file that contains the dependency list.>
 
 Again, if you use the C<bash> script that invokes this utility or are
 calling this utility with a F<buildspec.yml> file, these files will be
@@ -934,11 +1003,11 @@ I<automatically> created for you based on your options.  If you provide
 your own F<requires> or F<test-requires> file, modules should be
 listed as:
 
-  module-name, version
+  module-name version
 
 Example:
 
- AWS::Signature4,1.02
+ AWS::Signature4 1.02
  ...
 
 =head1 AUTHOR

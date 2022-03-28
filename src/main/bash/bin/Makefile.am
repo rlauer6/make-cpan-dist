@@ -5,7 +5,9 @@ bashrun = @BASHRUN@
 perlenv = @ENV@ perl
 scandeps = @SCANDEPS@
 
-BASHSCRIPTS = make-cpan-dist.in
+BASHSCRIPTS = \
+    make-cpan-dist.in \
+    upload2cpan
 
 GBASHSCRIPTS = $(BASHSCRIPTS:.in=)
 
