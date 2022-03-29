@@ -41,18 +41,17 @@ read -s PASSWORD
 
 if test -z "$TARBALL"; then
     TARBALL=$(ls -1t *.tar.gz 2>/dev/null | head -1)
-    if [ -e $TARBALL ]; then
-        echo -n -e "\nupload "$TARBALL" to CPAN? (y/n)"
-        read -n 1 -s ans
-        echo ""
-        if ! [ "$ans" = "y" ]; then
-            exit
-        fi
-    else
-        >&2 echo "ERROR: no distributions found to upload"
+fi
+
+if [ -e "$TARBALL" ]; then
+    echo -n -e "\nupload "$TARBALL" to CPAN? (y/n)"
+    read -n 1 -s ans
+    echo ""
+    if ! [ "$ans" = "y" ]; then
+        exit
     fi
 else
-    >&2 echo "ERROR: $TARBALL not found"
+    >&2 echo "ERROR: no distributions found to upload"
 fi
 
 # cpan-upload-http

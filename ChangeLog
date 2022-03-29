@@ -1,3 +1,10 @@
+Tue Mar 29 15:43:43 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.2 - add example, fix upload2cpan]:
+	* buildspec-example.yml: new
+	* src/main/bash/bin/upload2cpan.in
+	- test for existence of tarball first
+
 Tue Mar 29 11:44:29 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.1 - remove core files from requires]:

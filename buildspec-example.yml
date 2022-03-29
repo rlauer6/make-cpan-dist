@@ -1,0 +1,17 @@
+version: 0.1
+
+project:
+  description: "Secrets Manager Utility"
+  author:
+    name: Rob Lauer
+    mailto: rlauer6@comcast.net
+pm_module: Amazon::API::EC2
+path:
+  pm_module: ../src/main/perl/lib
+  exe_files: ../src/examples
+  recurse: no
+  provides:
+extra-files:
+
+dependencies:
+  path: requires
