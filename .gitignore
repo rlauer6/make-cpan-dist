@@ -38,3 +38,4 @@ src/main/perl/**/*.pm
 src/main/perl/**/*.pl
 src/main/bash/**/*.sh
 src/main/bash/bin/make-cpan-dist
+src/main/bash/bin/upload2cpan

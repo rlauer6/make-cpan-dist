@@ -1,3 +1,13 @@
+Tue Mar 29 16:58:06 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.3 - typo, pod]:
+	* VERSION: bump
+	* src/main/bash/bin/make-cpan-dist.in
+	- $requires_file, not $requires_files
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(pod): better explanation for resolver section
+	* .gitignore: + src/main/bash/bin/upload2cpan
+
 Tue Mar 29 15:43:43 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.2 - add example, fix upload2cpan]:

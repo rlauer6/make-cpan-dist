@@ -165,7 +165,7 @@ function scan() {
         else
             set -o pipefail
             INFO "Scanning (@scandeps@) $scan_target..."
-            if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" | awk '{print $1}' >> $requires_files; then
+            if ! @scandeps@ -R $scan_target | perl -npe "s/^\'(.*?)\'.*\$/\$1/;" | awk '{print $1}' >> $requires_file; then
                 FATAL_ERROR "could not resolve dependencies for $scan_target"
             else
                 DEBUG $(echo "SCAN:" && cat $requires_file)

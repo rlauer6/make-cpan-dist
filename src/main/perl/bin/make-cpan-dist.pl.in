@@ -924,7 +924,17 @@ Fully qualified path to a dependency list.
 =item resolver (optional)
 
 Name of a program that will provide a list of depenencies when passed
-a module name.
+a module name. Use the special name C<scandeps> to use Perl's
+C<scandeps.pl>.  When using C<scandeps.pl>, the C<-R> option will be
+used to prevent C<scandeps.pl> from recursing. Neither
+C</usr/lib/rpm/perl.req> or C<scandeps.pl> are completely
+reliable. Your methodology might be to use these to get a good start
+on a file containing dependencies and then add/subtract as required
+for your use case.
+
+When preparing the list of files to list as requirements in the
+C<PREREQ_PM> section of the C<Makefile.PL>, the script will
+automatically remove any modules that are already included with Perl.
 
 =back
 
