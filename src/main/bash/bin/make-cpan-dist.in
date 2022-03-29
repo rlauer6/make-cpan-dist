@@ -64,7 +64,6 @@ function WARN {
 }
 
 function DEBUG {
-    echo "LOG_LEVEL: $LOG_LEVEL"
     [ $LOG_LEVEL -ge 4 ] && 2>&1 echo "DEBUG: $1" && return
 }
 
@@ -517,7 +516,7 @@ fi
 # if that was successful, then try to build the distribution
 if ! test -e $builddir/Makefile.PL; then
     FATAL_ERROR "failed to build Makefile.PL"
-    exit;
+    exit 1;
 else
     cd $builddir
     test -n "$VERBOSE" && tree
@@ -528,7 +527,12 @@ else
         make dist
         cp *.tar.gz $destdir
         make test
-        test -n "$PRESERVE_MAKEFILE" && cp Makefile.PL $destdir
-        INFO "CPAN authors: cpan-upload-http $(ls -1rt *.tar.gz | tail -1)"
+        if test -n "$PRESERVE_MAKEFILE"; then
+            cp Makefile.PL $destdir
+        fi
+        
+        echo "CPAN authors: cpan-upload-http $(ls -1rt *.tar.gz | tail -1)"
     fi
 fi
+
+exit 0;

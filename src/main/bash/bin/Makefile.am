@@ -7,7 +7,7 @@ scandeps = @SCANDEPS@
 
 BASHSCRIPTS = \
     make-cpan-dist.in \
-    upload2cpan
+    upload2cpan.in
 
 GBASHSCRIPTS = $(BASHSCRIPTS:.in=)
 

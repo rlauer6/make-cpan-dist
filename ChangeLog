@@ -1,3 +1,17 @@
+Tue Mar 29 11:44:29 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.1 - remove core files from requires]:
+	* VERSION: new
+	* configure.ac: use VERSION file
+	* src/main/bash/bin/Makefile.am: upload2cpan.in
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(get_requires): filter core modules
+	* src/main/perl/lib/File/Process.pm.in: bump version
+	* src/main/bash/bin/make-cpan-dist.in
+	- remove debug messages
+	- exit 1 on Makefile.PL failure
+	- exit 0 on success
+
 Mon Mar 28 17:14:10 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.1 - File::Process]:

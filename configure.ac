@@ -1,4 +1,12 @@
-AC_INIT([make-cpan-dist], [1.5.0], [rlauer6@comcast.net])
+AC_INIT([make-cpan-dist],
+        m4_esyscmd_s([
+if test -z "$VERSION"; then \
+  VERSION=$(test -e VERSION && cat VERSION); \
+  VERSION=${VERSION:-0.0.0}; \
+fi; \
+echo $VERSION
+]),
+        m4_esyscmd_s([if test -z "$EMAIL"; then EMAIL=rclauer@gmail,com; fi; echo $EMAIL]),[make-cpan-dist])
 
 __poor_mans_expand_file_name () {
     _tmp_name=$1

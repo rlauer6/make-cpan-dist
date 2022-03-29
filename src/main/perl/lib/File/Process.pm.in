@@ -24,7 +24,7 @@ Readonly my $FALSE   => 0;
 Readonly my $EMPTY   => q{};
 Readonly my $NL      => "\n";
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 our %DEFAULT_PROCESSORS = (
   pre       => \&_pre,

@@ -18,6 +18,7 @@ use JSON::PP qw{ encode_json decode_json };
 use List::Util qw{ pairs };
 use Log::Log4perl qw{ :easy };
 use Log::Log4perl::Level;
+use Module::CoreList;
 
 use Pod::Usage;
 use ReadonlyX;
@@ -604,7 +605,15 @@ sub get_requires {
 
   process_file(
     $requires,
-    chomp   => $TRUE,
+    chomp  => $TRUE,
+    filter => sub {
+      my ( $fh, $all_lines, $args, $line ) = @_;
+      my ( $module, $version ) = split /\s/xsm, $line;
+
+      my @ms = Module::CoreList->find_modules(qr/^$module$/);
+
+      return @ms ? undef : $line;
+    },
     process => sub {
       my $line = pop @_;
       my ( $module, $version ) = split /\s/xsm, $line;
@@ -638,8 +647,6 @@ GetOptions(
   'scandeps|s',    'test-requires=s', 'verbose|V',  'version|v=s',
   'log-level|l=s', 'work-dir|w=s'
 );
-
-print STDERR Dumper \%options;
 
 if ( $options{help} ) {
   pod2usage(1);
@@ -697,6 +704,8 @@ if ( $options{buildspec} ) {
 else {
   write_makefile(%options);
 }
+
+exit 0;
 
 __END__
 
