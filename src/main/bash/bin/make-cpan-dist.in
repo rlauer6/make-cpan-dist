@@ -11,27 +11,28 @@ Utility to create a CPAN distribution. See 'man make-cpan-dist'
 
 Options
 -------
--a author      - author (ex: Anonymouse <anonymouse@example.org>)
--A any version - do not include version numbers for required modules
--b buildspec   - use a buildspec file instead of options
--d description - description to be included CPAN
--D file        - use file as the dependency list
--T file        - use file as the test dependency list
--e path        - path for extra .pl files to package
--h             - help
--f file        - file containing a list of extra files to include
--l path        - path to Perl modules
--L log level   - logging level 1=error, 5=trace
--m name        - module name
--o dir         - output directory (default: current directory)
--p             - preserve Makefile.PL
--P file        - file that contains a list of modules to be packaged
--r pgm         - script or program to list dependencies
--s             - use scandeps.pl to find dependncies
--R yes/no      - recurse directories for files to package (default: yes)
--t path        - path to test files
--v             - more verbose output
--x             - do not cleanup files
+-a author       - author (ex: Anonymouse <anonymouse@example.org>)
+-A any version  - do not include version numbers for required modules
+-b buildspec    - use a buildspec file instead of options
+-c core modules - include core modules (default is to omit)
+-d description  - description to be included CPAN
+-D file         - use file as the dependency list
+-T file         - use file as the test dependency list
+-e path         - path for extra .pl files to package
+-h              - help
+-f file         - file containing a list of extra files to include
+-l path         - path to Perl modules
+-L log level    - logging level 1=error, 5=trace
+-m name         - module name
+-o dir          - output directory (default: current directory)
+-p              - preserve Makefile.PL
+-P file         - file that contains a list of modules to be packaged
+-r pgm          - script or program to list dependencies
+-s              - use scandeps.pl to find dependncies
+-R yes/no       - recurse directories for files to package (default: yes)
+-t path         - path to test files
+-v              - more verbose output
+-x              - do not cleanup files
 
 * NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment
   variables.
@@ -181,12 +182,15 @@ function scan() {
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:" arg "$@"; do
+while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:c" arg "$@"; do
 
     case "${arg}" in
 
         A)
             ANY_VERSION="1";
+            ;;
+        c)
+            CORE_MODULES="--core-modules";
             ;;
         e)
             perl5bindir="$OPTARG";
@@ -307,6 +311,15 @@ fi
 test -z "$MODULE" && usage "no module specified";
 test -z "$author" && usage "no author specified";
 test -z "$description" && usage "no description";
+
+if test -n "$dependency_file"; then
+    if test -z "$CORE_MODULES"; then
+        CORE_MODULES="--no-core-modules"
+    fi
+else
+    # default: do not include core modules
+    CORE_MODULES=${CORE_MODULES:---no-core-modules}
+fi
 
 recurse_directories=${recurse_directories:-yes}
 
@@ -501,7 +514,7 @@ test -n "$VERBOSE" && test -e ${workdir}/test-requires && cat ${workdir}/test-re
 
 # create the Makefile.PL
 if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
-            -r ${workdir}/requires \
+            $CORE_MODULES -r ${workdir}/requires \
             -e $exe_files \
             -t ${workdir}/test-requires \
             -w ${builddir} \

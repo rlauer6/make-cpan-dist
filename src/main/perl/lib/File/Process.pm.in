@@ -196,22 +196,22 @@ sub process_file {
 } ## end sub process_file
 
 sub post {    ## no critic [Subroutines::RequireArgUnpacking]
-  my ( $fh, $all_lines, $args ) = @_;
-  return ( $_[2]->{default_processors}->{post}->(@_) );
+  return $_[2]->{default_processors}->{post}->(@_);
+}
+
+sub filter {    ## no critic [Subroutines::RequireArgUnpacking]
+  return $_[2]->{default_processors}->{filter}->(@_);
 }
 
 sub pre {    ## no critic [Subroutines::RequireArgUnpacking]
-  my ( $fh, $args ) = @_;
-  return ( $args->{default_processors}->{pre}->(@_) );
+  return $_[2]->{default_processors}->{pre}->(@_);
 }
 
 sub process {    ## no critic [Subroutines::RequireArgUnpacking]
-  my ( $fh, $all_lines, $args ) = @_;
   return $_[2]->{default_processors}->{process}->(@_);
 }
 
 sub next_line {    ## no critic [Subroutines::RequireArgUnpacking]
-  my ( $fh, $all_lines, $args ) = @_;
   return $_[2]->{default_processors}->{next_line}->(@_);
 }
 

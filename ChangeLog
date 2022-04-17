@@ -1,3 +1,23 @@
+Sun Apr 17 08:35:22 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.4 - core-modules]:
+	* VERSION: bump
+	* README: explain new options
+	* src/main/bash/bin/make-cpan-dist.in
+	- added -c option to indicate inclusion of core modules
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- import filter
+	(write_makefile)
+	- pass core-modules option to get_requires
+	(parse_dependencies)
+	- support core_modules option in yaml file
+	* src/main/perl/lib/File/Process.pm.in
+	(filter): new
+	(get_requires)
+	- call default filter() first
+	- skip core test if core modules enabled
+	- allow '+' to indicate keep core module
+
 Tue Mar 29 16:58:06 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.3 - typo, pod]:

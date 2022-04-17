@@ -7,11 +7,10 @@ Typically, because I may use the Redhat Package Manager to create Perl
 modules that can be installed as part of my application stacks, I
 don't bother with the creation of CPAN distributions.
 
-In order to possibly share some of these modules (or some might say
-inflict them on an unwary public ;-) ) and to use a more modern Perl
-toolchain (`cpanm`) to vendor libraries for use with AWS Lambdas, I've
-recently needed a quick and easy CPAN distribution creation utility.
-Hence this project.
+In order to possibly share some of these modules and to use a more
+modern Perl toolchain (`cpanm`) to vendor libraries for use with AWS
+Lambdas, I've recently needed a quick and easy CPAN distribution
+creation utility.  Hence this project.
 
 After installing the project you'll find more information by reading
 the man page.
@@ -25,7 +24,10 @@ man make-cpan-dist
 The goal is to take a set of Perl modules and possibly (hopefully)
 tests and _automatically_ create a CPAN distribution.  The _automatic_
 part is key, as I'd like this to simply be the tail end of a CI/CD
-pipeline for various projects.
+pipeline for various projects. You can create a CPAN distribution by
+turning knobs and levers (setting options) of the provided utilities
+or create a YAML file (typcially named `buildspec.yml`) that informs
+the utilities on what to package.
 
 To be clear, __this is not a comprehensive CPAN distribution creation
 utility__ and almost certainly will not work for more complex Perl
@@ -39,7 +41,7 @@ to let me know why and possibly how I might add new features to make
 it more applicable to a wider set of scenarios.  As the kids say,
 _pull requests are welcome too_.
 
-# Why is this easier than just building a `Makefile.PL` and doing the normal dance?
+## Why is this easier than just building a `Makefile.PL` and doing the normal dance?
 
 Well, to be upfront about it, __maybe it's not__. Personally, I like
 to take a bunch of steps I seldom will remember and package them in
@@ -140,7 +142,7 @@ stumble across.  That's not to say that it is fool proof or even a
 good dependency checker for Perl.  That is a subject of a long blog
 post I think I should write some day. Oh wait I did...
 
-[Perl Dependency Checking] (http://blogs.perl.org/users/rlauer/2019/01/perl-dependency-checking.html)
+[Perl Dependency Checking](http://blogs.perl.org/users/rlauer/2019/01/perl-dependency-checking.html)
 
 If you are running on a Debian based system you can grab
 `/usr/lib/rpm/perl.req` from the `rpm` package apparently.
@@ -276,12 +278,27 @@ control what and how things get packaged.
     resolver: scandeps
   ```
 
-* to manually specify a list of dependencies, set the `path` option under the
-  `dependencies` section to the path to a file that contains a list of
-  Perl modules. If the name of the file is `cpanfile` then it is
-  assumed to be a `cpanfile` formatted list, otherwise the list should
-  be a simple listing of module names.
+* to manually specify a list of dependencies, set the `path` option
+  under the `dependencies` section to the path to a file that contains
+  a list of Perl modules. If the name of the file is `cpanfile` then
+  it is assumed to be a `cpanfile` formatted list, otherwise the list
+  should be a simple listing of module names optionally followed by a
+  version (e.g. `List::Util 1.5`). By default core modules will be
+  filtered from the list of modules.  Include the option
+  `core_modules` with a value of 'yes' if you do not want to filter
+  out core modules. If you want to filter core modules but need to
+  include a core module with a specific version, place a + in front of
+  the module name (e.g. +List::Util 1.5). Some modules may be core,
+  but you need to use a newer version of the core module. This happens
+  when, for example you require features (or fixes) of a core module
+  that only appear in a newer version of perl.
   
+  ```
+  dependencies:
+    path: requires
+    core_modules: yes
+  ```
+
 ### The Harder Way
 
 A slighly harder way is to call the helper bash script directly with

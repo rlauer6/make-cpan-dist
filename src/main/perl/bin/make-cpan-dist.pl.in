@@ -11,7 +11,7 @@ use English qw{ -no_match_vars };
 use ExtUtils::MM;
 use File::Basename;
 use File::Find;
-use File::Process qw{ process_file };
+use File::Process qw{ process_file filter };
 use File::Temp qw{ :POSIX };
 use Getopt::Long qw{:config no_ignore_case };
 use JSON::PP qw{ encode_json decode_json };
@@ -241,14 +241,16 @@ sub write_makefile {
 
   $options{'test-requires'} = $options{'test-requires'} || 'test-requires';
 
-  my $pre_req = Dumper get_requires( $options{'requires'} );
+  my $pre_req
+    = Dumper get_requires( $options{'requires'}, $options{'core-modules'} );
   $pre_req =~ s/^\s*(.*?)$/$1/xsm;
   chomp $pre_req;
 
   my $test_req = {};
 
   if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
-    $test_req = Dumper get_requires( $options{'test-requires'} );
+    $test_req = Dumper get_requires( $options{'test-requires'},
+      $options{'core-modules'} );
     $test_req =~ s/^\s*(.*?)$/$1/xsm;
   }
   else {
@@ -459,6 +461,10 @@ sub parse_dependencies {
       $args{D} = $dependencies->{'path'};
     }
 
+    if ( $dependencies->{'core_modules'} eq 'yes' ) {
+      $args{c} = $EMPTY;
+    }
+
     if ( my $resolver = $dependencies->{'resolver'} ) {
       if ( $resolver eq 'scandeps' ) {
         $args{s} = $EMPTY;
@@ -599,15 +605,22 @@ sub parse_buildspec {
 } ## end sub parse_buildspec
 
 sub get_requires {
-  my ($requires) = @_;
+  my ( $requires, $core_modules ) = @_;
 
   my %modules;
 
   process_file(
     $requires,
-    chomp  => $TRUE,
-    filter => sub {
+    chomp            => $TRUE,
+    skip_blank_lines => $TRUE,
+    filter           => sub {
       my ( $fh, $all_lines, $args, $line ) = @_;
+      $line = filter( $fh, $all_lines, $args, $line );
+
+      return $line if !defined $line;
+      return $line if $core_modules;
+      return $line if $line =~ /^\+/xsm;
+
       my ( $module, $version ) = split /\s/xsm, $line;
 
       my @ms = Module::CoreList->find_modules(qr/^$module$/);
@@ -616,7 +629,11 @@ sub get_requires {
     },
     process => sub {
       my $line = pop @_;
+
+      $line =~ s/^\+([^+]*)$/$1/;
+
       my ( $module, $version ) = split /\s/xsm, $line;
+
       $modules{$module} = $version;
 
       return $line;
@@ -645,7 +662,7 @@ GetOptions(
   'cleanup!',      'dryrun',          'debug|D',    'exe-files=s',
   'help|h',        'noversion|n',     'module=s',   'requires|r=s',
   'scandeps|s',    'test-requires=s', 'verbose|V',  'version|v=s',
-  'log-level|l=s', 'work-dir|w=s'
+  'core-modules!', 'log-level|l=s',   'work-dir|w=s',
 );
 
 if ( $options{help} ) {
