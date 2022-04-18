@@ -1,3 +1,13 @@
+Mon Apr 18 14:28:38 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.8 - pod, perlcritic cleanup]:
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(get_yaml_specfile): don't return explicit undef
+	* src/main/perl/lib/File/Process.pm.in
+	(pod)
+	- + EXPORTED METHODS section
+	- fix SYNOPSIS (no need to import process_file)
+
 Mon Apr 18 10:59:07 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.7 - build file validation]:

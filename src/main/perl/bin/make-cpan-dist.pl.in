@@ -746,7 +746,7 @@ sub get_yaml_specfile {
 
       my $line = <$fh>;
 
-      return undef if $line =~ /^\=pod/xsm;
+      return if $line =~ /^\=pod/xsm;    # signal end of file
 
       return $line;
     }
