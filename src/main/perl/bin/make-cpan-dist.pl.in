@@ -50,21 +50,22 @@ Example: $PROGRAM_NAME -m Some::Module -a 'Rob Lauer <rlauer6\@comcast.net>' -d 
 
 OPTIONS
 -------
--c, --cleanup         cleanup files, this is default
-                      use --no-cleanup to prevent cleanup
--a, --author          author
--A, --any             do not require a version
--B, --build-requires  build dependencies
--b, --buildspec       read a buildspec and create command line
--d, --abstract        abstract
--l, --log-level       ERROR, WARN, INFO, DEBUG, TRACE
--m, --module          module name
--M, --module-list     list of modules to include in distribution
--n, --noversion       do not include versions
--r, --requires        dependency list
--t, --test-requires   test dependencies
--s, --scandeps        use scandeps for dependency checking
--v, --version         version
+-c, --cleanup             cleanup files, this is default
+    --no-cleanup
+-a, --author              author
+-A, --any                 do not require a version
+-B, --build-requires      build dependencies
+-b, --buildspec           read a buildspec and create command line
+-d, --abstract            abstract
+-l, --log-level           ERROR, WARN, INFO, DEBUG, TRACE
+-m, --module              module name
+-M, --module-list         list of modules to include in distribution
+-r, --requires            dependency list
+-R, --require-versions    add version numbers to dependencies
+    --no-require-versions
+-t, --test-requires       test dependencies
+-s, --scandeps            use scandeps for dependency checking
+-v, --version             version
 
 Typically, this script is called from the bash helper script of the same
 name (make-cpan-dist) or is invoked with a YAML file that specifies
@@ -73,6 +74,8 @@ the parmeters used to build a distribution.
 See https://github.com/rlauer6/make-cpan-dist.git for more documentation.
 
 See man make-cpan-dist
+
+Version: $VERSION
 
 END_OF_TEXT
   return $SH_FAILURE;
@@ -608,7 +611,8 @@ sub parse_buildspec {
 
   # set boolean args from options
 
-  my @boolean_args = qw{ verbose v cleanup !x scandeps s noversion A };
+  my @boolean_args
+    = qw{ verbose v cleanup !x scandeps s require-versions !A };
 
   foreach my $pair ( pairs @boolean_args ) {
     my ( $key, $value ) = @{$pair};
@@ -669,7 +673,7 @@ sub get_requires {
       $line =~ s/^\+([^+]*)$/$1/;
 
       my ( $module, $version ) = split /\s/xsm, $line;
-      $version = $version // '0';
+      $version = $version || '0';
 
       $modules{$module} = $version;
 
@@ -701,18 +705,22 @@ GetOptions(
   'core-modules!',      'dryrun',
   'debug|D',            'exe-files=s',
   'help|h',             'log-level|l=s',
-  'module=s',           'noversion|n',
+  'module=s',           'require-versions!',
   'requires|r=s',       'scandeps|s',
   'test-requires=s',    'verbose|V',
-  'version|v=s',        'work-dir|w=s',
+  'version|v',          'work-dir|w=s',
 );
 
 if ( $options{help} ) {
-  pod2usage(1);
+  help;
+}
+
+if ( !exists $options{'require-versions'} ) {
+  $options{'require-versions'} = $TRUE;
 }
 
 if ( $options{'version'} ) {
-  print $PROGRAM_NAME . 'v' . $VERSION . $NL;
+  print $PROGRAM_NAME . ' v' . $VERSION . $NL;
 
   exit $SH_SUCCESS;
 }
@@ -822,14 +830,9 @@ If you insist on using this utility directly anyway, read on.
 
 =over 5
 
-=item -m, --module
+=item -A, --abstract
 
-Name of the module
-
-=item -b, --buildspec
-
-Name of a build specification file.  The build specification file is
-used B<instead> of options. See L</Build Specificaton Format>.
+Short description of the module purpose.
 
 =item -a, --author
 
@@ -838,22 +841,51 @@ address in angle brackets as shown in the example.
 
 Example: -a 'Rob Lauer <rlauer6@comcast.net>'
 
-=item -A, --abstract
+=item -B, --build-requires
 
-Short description of the module purpose.
+Name of the dependeny file list for building the distribution.
 
-=item -r, --requires
+=item -b, --buildspec
 
-Name of the dependency file list if other than F<requires>.
-
-=item -t, --test-requires
-
-Name of the test dependencies file if other than F<test-requires>.
+Name of a build specification file.  The build specification file is
+used B<instead> of options. See L</Build Specificaton Format>.
 
 =item -c, --cleanup
 
 Cleanup temp directories and files.  Default is to cleanup, use
 --no-cleanup if you want to examine some of the temporary files.
+
+=item -l, --log-level
+
+Log level.
+
+Valid values: error|warn|info|debug
+
+=item -m, --module
+
+Name of the module
+
+=item -M, --module-list
+
+List of modules to include in distribution
+
+=item -R, --require-versions, --no-require-versions
+
+Whether to add version numbers to dependencies.
+
+default: --require-versions
+
+=item -r, --requires
+
+Name of the dependency file list if other than F<requires>.
+
+=item -s, --scandeps
+
+Use scandeps for dependency checking
+
+=item -t, --test-requires
+
+Name of the test dependencies file if other than F<test-requires>.
 
 =item -v, --version
 

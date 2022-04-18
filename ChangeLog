@@ -1,3 +1,16 @@
+Mon Apr 18 07:22:54 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.6 - dependency version]:
+	* VERSION: bump
+	* bootstrap: configure after bump
+	* src/main/perl/lib/make-cpan-dist.pl.in
+	- --require-versions instead of --noversion
+	- --version option should not take argument
+	- use help, not pod2usage
+	(parse_buildspec): require-versions, not noversion
+	(get_requires):
+	- version = 0 if undef or ''
+
 Mon Apr 18 04:33:45 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.5 - test_requires]:

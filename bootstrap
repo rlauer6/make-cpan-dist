@@ -4,8 +4,15 @@
 function _bump {
     version=$(mktemp)
     eval $(echo perl -ne "'my \$p=$1; my @v=split /\./; \$v[2]=0 if \$p == 1; \$v[1] = \$v[2] = 0 unless \$p; \$v[\$p]++; print join(\".\", @v);'" VERSION) > $version
+
     test -e "$version" && mv $version VERSION
+
     cat VERSION
+    
+    if test -x bootstrap; then
+        ./bootstrap
+        ./configure
+    fi
 }
 
 function bump {
