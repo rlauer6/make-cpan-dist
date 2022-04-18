@@ -5,13 +5,12 @@ use warnings;
 
 use parent qw{ Exporter };
 
-use vars qw{ @EXPORT_OK @EXPORT };
+our @EXPORT = qw{ process_file };
 
-@EXPORT    = qw{ process_file };
-@EXPORT_OK = qw{ post pre process filter next_line };
+our @EXPORT_OK   = qw{ post pre process filter next_line };
+our %EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
 
 use Carp;
-use Carp::Always;
 use English qw{-no_match_vars};
 use IO::Scalar;
 use ReadonlyX;
@@ -24,7 +23,7 @@ Readonly my $FALSE   => 0;
 Readonly my $EMPTY   => q{};
 Readonly my $NL      => "\n";
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 our %DEFAULT_PROCESSORS = (
   pre       => \&_pre,
@@ -204,7 +203,7 @@ sub filter {    ## no critic [Subroutines::RequireArgUnpacking]
 }
 
 sub pre {    ## no critic [Subroutines::RequireArgUnpacking]
-  return $_[2]->{default_processors}->{pre}->(@_);
+  return $_[1]->{default_processors}->{pre}->(@_);
 }
 
 sub process {    ## no critic [Subroutines::RequireArgUnpacking]
@@ -343,7 +342,7 @@ File::Process - process text files with customer handlers
 
 =head1 SYNOPSIS
 
- use File::Process;
+ use File::Process qw{ process_file };
 
  my ($lines, $info) = process_file($file, process => sub { 
      my ($fh, $lines, $args, $line) = @_;

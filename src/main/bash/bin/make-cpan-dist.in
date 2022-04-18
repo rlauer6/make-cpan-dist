@@ -1,7 +1,9 @@
 #!@bashrun@
 # -*- mode: sh; -*-
 
+########################################################################
 function usage {
+########################################################################
     test -n "$1" && echo "error: $1";
     
     cat <<EOT
@@ -14,6 +16,7 @@ Options
 -a author       - author (ex: Anonymouse <anonymouse@example.org>)
 -A any version  - do not include version numbers for required modules
 -b buildspec    - use a buildspec file instead of options
+-B file         - use file as the build dependency list
 -c core modules - include core modules (default is to omit)
 -d description  - description to be included CPAN
 -D file         - use file as the dependency list
@@ -46,38 +49,54 @@ EOT
     exit;
 }
 
+########################################################################
 function FATAL_ERROR {
+########################################################################
     ERROR "$1"
     
     exit "${2:-1}"
 }
 
+########################################################################
 function ERROR {
+########################################################################
     [ "$LOG_LEVEL" -ge 1 ] && 2>&1 echo "ERROR: $1" && return
 }
 
+########################################################################
 function INFO {
+########################################################################
     [ "$LOG_LEVEL" -ge 2 ] && 2>&1 echo "INFO: $1" && return
 }
 
+########################################################################
 function WARN {
+########################################################################
     [ "$LOG_LEVEL" -ge 3 ] && 2>&1 echo "WARN: $1" && return
 }
 
+########################################################################
 function DEBUG {
+########################################################################
     [ $LOG_LEVEL -ge 4 ] && 2>&1 echo "DEBUG: $1" && return
 }
 
+########################################################################
 function TRACE {
+########################################################################
     [ "$LOG_LEVEL" -ge 5 ] && 2>&1 echo "TRACE: $1" && return
 }
 
+########################################################################
 function module2path {
+########################################################################
     echo "$(echo $1 | perl -npe 's/::/\//g').pm"
 }
 
 # look for project home directory from here back, sets PROJECT_HOME
+########################################################################
 function find_git_home {
+########################################################################
     project_home="..";
     git_home=""
 
@@ -97,7 +116,9 @@ function find_git_home {
 }
 
 # cleanup on exit
+########################################################################
 function cleanup {
+########################################################################
     test -n "$NOCLEANUP" && return;
     
     test -n "$testsfile" && rm "$testsfile"
@@ -115,7 +136,9 @@ function cleanup {
 }
 
 # default dependency finder
+########################################################################
 function perl_requires {
+########################################################################
     if test -n "@PERL_REQUIRES@"; then
         /usr/lib/rpm/perl.req "$1" | perl -npe 's/^perl\((.*)\)/$1/'
     else
@@ -125,7 +148,9 @@ function perl_requires {
 }
 
 # attempts to grab module versions
+########################################################################
 function get_module_versions {
+########################################################################
     infile="$1"
     
     if ! test -e "$infile"; then
@@ -155,13 +180,15 @@ function get_module_versions {
     rm $modules
 }
 
+########################################################################
 function scan() {
+########################################################################
     scan_target="$1";
     requires_file="$2";
     
     if [ "$PERL_REQUIRES" = "SCANDEPS" ]; then
         if test -z "@scandeps@"; then
-            FATA_ERROR "no scandeps.pl found!"
+            FATAL_ERROR "no scandeps.pl found!"
             exit 1
         else
             set -o pipefail
@@ -182,104 +209,116 @@ function scan() {
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-while getopts "h?Ab:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:c" arg "$@"; do
+while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:c" arg "$@"; do
 
     case "${arg}" in
 
         A)
             ANY_VERSION="1";
             ;;
-        c)
-            CORE_MODULES="--core-modules";
-            ;;
-        e)
-            perl5bindir="$OPTARG";
-            ;;
-        
-        z)
-            DRYRUN="--dryrun";
-            shift;
-            ;;
-        
-        b) BUILDSPEC="$OPTARG";
-           ;;
-        
-        D)
-            dependency_file="$OPTARG";
-            ;;
-
-        T)
-            test_dependency_file="$OPTARG";
-            ;;
-        
-        s)
-            PERL_REQUIRES="SCANDEPS"
-            ;;
-
-        R)
-            recurse_directories="$OPTARG";
-            ;;
-
-        P)
-            provides="$OPTARG";
-            test -n "$provides" && recurse_directories="no"
-            ;;
-
-        f)
-            EXTRA="$OPTARG";
-            ;;
-
-        x)
-            NOCLEANUP="1";
-            ;;
-
-        p)
-            PRESERVE_MAKEFILE="1";
-            ;;
-
-        v)
-            VERBOSE="1";
-            ;;
-
-        o)
-            destdir="$OPTARG";
-            ;;
 
         a)
             author="$OPTARG";
             ;;
 
-        h)
-	    usage;
-	    ;;
+        B)
+            if test -e "$OPTARG"; then
+                BUILD_REQUIRES="--build-requires $OPTARG";
+            else
+                FATAL_ERROR "build dependency fil [$OPTARG] not found!"
+            fi
+            ;;
+        
+        b) BUILDSPEC="$OPTARG";
+           ;;
 
-        m)
-            MODULE="$OPTARG";
+        c)
+            CORE_MODULES="--core-modules";
+            ;;
+
+        D)
+            dependency_file="$OPTARG";
             ;;
 
         d)
             description="$OPTARG";
             ;;
 
+        e)
+            perl5bindir="$OPTARG";
+            ;;
+        
+        f)
+            EXTRA="$OPTARG";
+            ;;
+
         g)
             git_project="$OPTARG";
             ;;
 
-        l)
-            perl5libdir="$OPTARG";
-            ;;
+
+        h)
+	    usage;
+	    ;;
 
         L)
             LOG_LEVEL="$OPTARG";
             ;;
         
+        l)
+            perl5libdir="$OPTARG";
+            ;;
+
+        m)
+            MODULE="$OPTARG";
+            ;;
+
+        o)
+            destdir="$OPTARG";
+            ;;
+        P)
+            provides="$OPTARG";
+            test -n "$provides" && recurse_directories="no"
+            ;;
+
+        p)
+            PRESERVE_MAKEFILE="1";
+            ;;
+
+        R)
+            recurse_directories="$OPTARG";
+            ;;
+
+
         r)
             PERL_REQUIRES="$OPTARG";
+            ;;
+
+        s)
+            PERL_REQUIRES="SCANDEPS"
+            ;;
+
+        T)
+            test_dependency_file="$OPTARG";
             ;;
 
         t)
             testsdir="$OPTARG";
             ;;
+
+        v)
+            VERBOSE="1";
+            ;;
+
+        x)
+            NOCLEANUP="1";
+            ;;
+
+        z)
+            DRYRUN="--dryrun";
+            shift;
+            ;;
+        
     esac
 done
 
@@ -482,7 +521,7 @@ fi
 
 if test -n "$test_dependency_file"; then
     cp $test_dependency_file ${workdir}/test-requires.tmp
-    cp ${workdir}/test-requires.tmp {workdir}/test-requires
+    cp ${workdir}/test-requires.tmp ${workdir}/test-requires
 else
     if test -n "$testsdir"; then
         if test -d "$testsdir"; then
@@ -514,7 +553,7 @@ test -n "$VERBOSE" && test -e ${workdir}/test-requires && cat ${workdir}/test-re
 
 # create the Makefile.PL
 if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
-            $CORE_MODULES -r ${workdir}/requires \
+            $CORE_MODULES $BUILD_REQUIRES -r ${workdir}/requires \
             -e $exe_files \
             -t ${workdir}/test-requires \
             -w ${builddir} \
