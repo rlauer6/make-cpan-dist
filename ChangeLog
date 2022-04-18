@@ -1,3 +1,13 @@
+Mon Apr 18 10:59:07 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.7 - build file validation]:
+	* VERSION: bump
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- $FALSE = 0
+	(validate_object): new
+	(get_yaml_specfile): new
+	(parse_buildspec): validate yaml file
+
 Mon Apr 18 07:22:54 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.6 - dependency version]:

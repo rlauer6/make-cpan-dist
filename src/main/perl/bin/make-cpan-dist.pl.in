@@ -26,7 +26,7 @@ use Scalar::Util qw{ reftype };
 use YAML::Tiny;
 
 Readonly my $TRUE         => 1;
-Readonly my $FALSE        => 1;
+Readonly my $FALSE        => 0;
 Readonly my $DASH         => q{-};
 Readonly my $DOUBLE_COLON => q{::};
 Readonly my $EMPTY        => q{};
@@ -42,7 +42,9 @@ Readonly my $SUCCESS      => 1;
 
 our $VERSION = '@PACKAGE_VERSION@';
 
+########################################################################
 sub help {
+########################################################################
   print <<"END_OF_TEXT";
 usage: $PROGRAM_NAME OPTIONS
 
@@ -103,7 +105,9 @@ sub get_exe_file_list {
   return $lines ? @{$lines} : ();
 } ## end sub get_exe_file_list
 
+########################################################################
 sub make_path_from_module {
+########################################################################
   my ($module) = @_;
 
   my $file = join $SLASH, split /$DOUBLE_COLON/xsm, $module;
@@ -111,7 +115,9 @@ sub make_path_from_module {
   return "$file.pm";
 } ## end sub make_path_from_module
 
+########################################################################
 sub get_provides {
+########################################################################
   my ( $file, %options ) = @_;
 
   my %provides;
@@ -160,11 +166,15 @@ sub get_provides {
   return %provides;
 } ## end sub get_provides
 
+########################################################################
 sub get_resources {
+########################################################################
   goto &get_json_file;
 }
 
+########################################################################
 sub get_json_file {
+########################################################################
   my ($file) = @_;
 
   my ($json) = process_file(
@@ -176,7 +186,9 @@ sub get_json_file {
   return decode_json($json);
 } ## end sub get_json_file
 
+########################################################################
 sub write_resources {
+########################################################################
   my ( $resources, %args ) = @_;
 
   my $resources_file;
@@ -196,7 +208,9 @@ sub write_resources {
   return %args;
 } ## end sub write_resources
 
+########################################################################
 sub write_provides {
+########################################################################
   my ( $provides, %args ) = @_;
 
   my $provides_file;
@@ -220,7 +234,9 @@ sub write_provides {
   return %args;
 } ## end sub write_provides
 
+########################################################################
 sub write_makefile {
+########################################################################
   my (%options) = @_;
 
   my $module = $options{'module'};
@@ -359,7 +375,9 @@ END_OF_TEXT
   return $SH_SUCCESS;
 } ## end sub write_makefile
 
+########################################################################
 sub write_file_list {
+########################################################################
   my ( $file_list, $destdir ) = @_;
 
   my @expanded_list;
@@ -397,7 +415,9 @@ sub write_file_list {
 # extra-files:
 #   - file
 
+########################################################################
 sub write_extra_files {
+########################################################################
   my ( $extra_files, $extra, %args ) = @_;
 
   return %args
@@ -448,7 +468,9 @@ sub write_extra_files {
   return %args;
 } ## end sub write_extra_files
 
+########################################################################
 sub parse_path {
+########################################################################
   my ( $path, %args ) = @_;
 
   if ($path) {
@@ -478,7 +500,9 @@ sub parse_path {
   return %args;
 } ## end sub parse_path
 
+########################################################################
 sub parse_dependencies {
+########################################################################
   my ( $dependencies, %args ) = @_;
 
   if ($dependencies) {
@@ -521,7 +545,9 @@ sub parse_dependencies {
   return %args;
 } ## end sub parse_dependencies
 
+########################################################################
 sub parse_include_version {
+########################################################################
   my ( $version, %args ) = @_;
 
   if ( defined $version ) {
@@ -532,7 +558,9 @@ sub parse_include_version {
   return %args;
 } ## end sub parse_include_version
 
+########################################################################
 sub parse_project {
+########################################################################
   my ( $project, %args ) = @_;
 
   if ($project) {
@@ -560,7 +588,9 @@ sub parse_project {
   return %args;
 } ## end sub parse_project
 
+########################################################################
 sub parse_pm_module {
+########################################################################
   my ( $pm_module, %args ) = @_;
 
   if ($pm_module) {
@@ -569,7 +599,9 @@ sub parse_pm_module {
   return %args;
 } ## end sub parse_pm_module
 
+########################################################################
 sub get_buildspec {
+########################################################################
   my ($file) = @_;
 
   croak 'file not found or empty ' . $file . $NL
@@ -583,12 +615,17 @@ sub get_buildspec {
   return $buildspec;
 } ## end sub get_buildspec
 
+########################################################################
 sub parse_buildspec {
+########################################################################
   my (%options) = @_;
 
   my $file = $options{buildspec};
 
   my $buildspec = get_buildspec($file);
+
+  croak 'bad build file'
+    if !validate_object( $buildspec, $options{'yaml-spec'} );
 
   my %args;
 
@@ -644,7 +681,9 @@ sub parse_buildspec {
   return %args;
 } ## end sub parse_buildspec
 
+########################################################################
 sub get_requires {
+########################################################################
   my ( $requires, $core_modules ) = @_;
 
   my %modules;
@@ -684,13 +723,65 @@ sub get_requires {
   return \%modules;
 } ## end sub get_requires
 
+########################################################################
 sub get_modules {
+########################################################################
   my ($module_list) = @_;
 
   my ($modules) = process_file( $module_list, chomp => $TRUE );
 
   return $modules;
 } ## end sub get_modules
+
+########################################################################
+sub get_yaml_specfile {
+########################################################################
+  my ($options) = @_;
+
+  my ($lines) = process_file(
+    *DATA,
+    chomp     => $TRUE,
+    next_line => sub {
+      my ( $fh, $all_lines, $args ) = @_;
+
+      my $line = <$fh>;
+
+      return undef if $line =~ /^\=pod/xsm;
+
+      return $line;
+    }
+  );
+
+  return Load join "\n", @{$lines};
+} ## end sub get_yaml_specfile
+
+########################################################################
+sub validate_object {
+########################################################################
+  my ( $obj, $spec, $err ) = @_;
+  $err = $err // 0;
+
+  foreach my $k ( keys %{$obj} ) {
+    if ( !exists $spec->{$k} ) {
+      warn "ERROR: not a valid key ($k)\n";
+      $err++;
+    }
+
+    if ( ref $spec->{$k} ) {
+      if ( !ref( $obj->{$k} )
+        || reftype( $obj->{$k} ) ne reftype( $spec->{$k} ) ) {
+        warn "ERROR: wrong type for ($k) - $k must be "
+          . reftype( $spec->{$k} ) . "\n";
+        $err++;
+      } ## end if ( !ref( $obj->{$k} ...))
+      else {
+        validate_object( $obj->{$k}, $spec->{$k}, $err );
+      }
+    } ## end if ( ref $spec->{$k} )
+  } ## end foreach my $k ( keys %{$obj...})
+
+  return $err ? $FALSE : $TRUE;
+} ## end sub validate_object
 
 # +-------------------------+
 # | MAIN SCRIPT STARTS HERE |
@@ -714,6 +805,8 @@ GetOptions(
 if ( $options{help} ) {
   help;
 }
+
+$options{'yaml-spec'} = get_yaml_specfile;
 
 if ( !exists $options{'require-versions'} ) {
   $options{'require-versions'} = $TRUE;
@@ -774,7 +867,43 @@ else {
 
 exit 0;
 
-__END__
+__DATA__
+---
+version: "@PACKAGE_VERSION@"
+project:
+  git: "type:string"
+  description: "type:string"
+  author:
+    name: "type:string"
+    mailto: "type:string"
+pm_module:
+include-version: "type:boolean"
+dependencies:
+  resolver: "type:string"
+  path: "type:string"
+  requires: "type:string"
+  test_requires: "type:string"
+  build_requires: "type:string"
+  core_modules: "type::boolean"
+path:
+  recurse: "type:boolean"
+  pm_module: "type:string"
+  tests: "type:string"
+  exe_files: "type:string"
+destdir: "type:string"
+extra: "type:string"
+extra-files:
+  -
+provides: "type:string"
+resources:
+  homepage: "type:string"
+  bugtracker:
+    web: "type:string"
+    mailto: "type:string"
+  repository:
+    url: "type:string"
+    web: "type:string"
+    type: "type:string"
 
 =pod
 
@@ -797,7 +926,7 @@ Utility that is part of the toolchain to create a simple CPAN
 distribution. This utility is typically called from the C<bash> helper
 script of the same name or can be passed a build specfication file in
 YAML format. You may I<not> find this easier to use than crafting your
-own CPAN distirbutions with the various tools available for
+own CPAN distributions with the various tools available for
 such.
 
 The helper script (F<make-cpan-dist>) does most of the heavy lifting,
