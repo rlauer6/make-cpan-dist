@@ -23,7 +23,7 @@ Readonly my $FALSE   => 0;
 Readonly my $EMPTY   => q{};
 Readonly my $NL      => "\n";
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 our %DEFAULT_PROCESSORS = (
   pre       => \&_pre,
