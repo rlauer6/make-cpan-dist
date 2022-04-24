@@ -581,6 +581,10 @@ else
     test -n "$VERBOSE" && tree
     test -n "$VERBOSE" && cat Makefile.PL
     
+    if perltidy Makefile.PL; then
+        mv Makefile.PL.tdy Makefile.PL;
+    fi
+       
     if perl Makefile.PL; then
         make manifest
         make dist
