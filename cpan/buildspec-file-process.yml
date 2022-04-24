@@ -1,0 +1,12 @@
+version: 0.1
+
+project:
+  description: "File processing utility"
+  author:
+    name: Rob Lauer
+    mailto: rlauer6@comcast.net
+pm_module: File::Process
+path:
+  tests: ../src/main/perl/lib/t
+  pm_module: ../src/main/perl/lib
+  recurse: no

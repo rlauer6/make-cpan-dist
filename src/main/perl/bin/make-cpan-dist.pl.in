@@ -1,11 +1,15 @@
 #!@perlrun@
 
+package CPAN::Maker;
+
 # a CPAN distribution creation utility
 
 use strict;
 use warnings;
 
 use Carp;
+use CPAN::Maker::Constants qw{ :all };
+use CPAN::Maker::Utils qw{ :all };
 use Data::Dumper;
 use English qw{ -no_match_vars };
 use ExtUtils::MM;
@@ -18,29 +22,14 @@ use JSON::PP qw{ encode_json decode_json };
 use List::Util qw{ pairs };
 use Log::Log4perl qw{ :easy };
 use Log::Log4perl::Level;
-use Module::CoreList;
 
 use Pod::Usage;
-use ReadonlyX;
 use Scalar::Util qw{ reftype };
 use YAML::Tiny;
 
-Readonly my $TRUE         => 1;
-Readonly my $FALSE        => 0;
-Readonly my $DASH         => q{-};
-Readonly my $DOUBLE_COLON => q{::};
-Readonly my $EMPTY        => q{};
-Readonly my $FAILURE      => 0;
-Readonly my $FAT_ARROW    => q{=>};
-Readonly my $INDENT       => 4;
-Readonly my $NL           => qq{\n};
-Readonly my $SH_FAILURE   => 1;
-Readonly my $SH_SUCCESS   => 0;
-Readonly my $SLASH        => q{/};
-Readonly my $SPACE        => q{ };
-Readonly my $SUCCESS      => 1;
-
 our $VERSION = '@PACKAGE_VERSION@';
+
+caller or __PACKAGE__->main();
 
 ########################################################################
 sub help {
@@ -106,16 +95,6 @@ sub get_exe_file_list {
 } ## end sub get_exe_file_list
 
 ########################################################################
-sub make_path_from_module {
-########################################################################
-  my ($module) = @_;
-
-  my $file = join $SLASH, split /$DOUBLE_COLON/xsm, $module;
-
-  return "$file.pm";
-} ## end sub make_path_from_module
-
-########################################################################
 sub get_provides {
 ########################################################################
   my ( $file, %options ) = @_;
@@ -136,27 +115,23 @@ sub get_provides {
           return ();
         }
 
-        my ( $provided_module, $version ) = split /\s+/xsm, $module;
-
-        my $file = make_path_from_module($provided_module);
-        my $path = $args->{'prefix'} . $SLASH . $file;
+        my $include_path = $args->{'prefix'};
 
         if ( $options{'work-dir'} ) {
-          $path = $options{'work-dir'} . '/' . $path;
+          $include_path = $options{'work-dir'} . $SLASH . $include_path;
         }
 
-        if ( -e $path ) {
-          if ( !$version ) {
-            $version = eval { return ExtUtils::MM->parse_version($path); };
-          }
-        }
-        else {
-          croak "could not find $path\n";
-        }
+        my $module_version = get_module_version( $module, $include_path );
+
+        my ( $provided_module, $version )
+          = @{$module_version}{qw{ module version}};
+
+        croak "$module not found in $include_path"
+          if !defined $version;
 
         $provides{$provided_module} = {
-          file    => $args->{prefix} . '/' . $file,
-          version => $version // 0,
+          file    => $args->{prefix} . $SLASH . $module_version->{'file'},
+          version => $version,
         };
 
         return $provided_module;
@@ -239,27 +214,16 @@ sub write_makefile {
 ########################################################################
   my (%options) = @_;
 
-  my $module = $options{'module'};
-  my $author = $options{'author'} || 'Anonyous <anonymous@example.com>';
-  my $module_abstract = $options{'abstract'} || 'my awesome Perl module!';
+  my $core            = $options{'core-modules'};
+  my $module_abstract = $options{'abstract'};
+  my $author          = $options{'author'};
 
-  if ( $options{'help'} || !( $module && $author && $module_abstract ) ) {
-    return help();
-  }
+  my $module = 'lib/' . make_path_from_module( $options{'module'} );
 
-  croak "no dependencies\n"
-    if !$options{'requires'};
-
-  while ( $module =~ s/::/\//xsmg ) { }
-
-  $module = 'lib/' . $module . '.pm';
-
-  local $Data::Dumper::Terse    = 1;
-  local $Data::Dumper::Sortkeys = 1;
+  local $Data::Dumper::Terse    = $TRUE;
+  local $Data::Dumper::Sortkeys = $TRUE;
   local $Data::Dumper::Indent   = 2;
   local $Data::Dumper::Pad      = $SPACE x $INDENT;
-
-  my $core = $options{'core-modules'};
 
   # dependencies
   foreach my $d (qw{requires test-requires build-require }) {
@@ -267,24 +231,21 @@ sub write_makefile {
   }
 
   my $pre_req = Dumper get_requires( $options{'requires'}, $core );
-  $pre_req =~ s/^\s*(.*?)$/$1/xsm;
-  chomp $pre_req;
+  $pre_req = trim($pre_req);
 
   my $test_req = {};
 
   if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
     $test_req = Dumper get_requires( $options{'test-requires'}, $core );
-    $test_req =~ s/^\s*(.*?)$/$1/xsm;
   }
-  else {
-    $test_req = Dumper $test_req;
-  }
+
+  $test_req = trim($test_req);
 
   my $build_req = {};
 
   if ( $options{'build-requires'} && -s $options{'build-requires'} ) {
     $build_req = Dumper get_requires( $options{'build-requires'}, $TRUE );
-    $build_req =~ s/^\s*(.*?)$/$1/xsm;
+    $build_req = trim($build_req);
   }
 
   foreach my $m (qw{ ExtUtils::MakeMaker File::ShareDir::Install}) {
@@ -698,18 +659,14 @@ sub get_requires {
 
       return $line if !defined $line;
       return $line if $core_modules;
-      return $line if $line =~ /^\+/xsm;
+      return $line if $line =~ /^[+]/xsm;
 
-      my ( $module, $version ) = split /\s/xsm, $line;
-
-      my @ms = Module::CoreList->find_modules(qr/^$module$/);
-
-      return @ms ? undef : $line;
+      return is_core($line) ? undef : $line;
     },
     process => sub {
       my $line = pop @_;
 
-      $line =~ s/^\+([^+]*)$/$1/;
+      $line =~ s/^[+]([^+]*)$/$1/xsm;
 
       my ( $module, $version ) = split /\s/xsm, $line;
       $version = $version || '0';
@@ -759,6 +716,7 @@ sub get_yaml_specfile {
 sub validate_object {
 ########################################################################
   my ( $obj, $spec, $err ) = @_;
+
   $err = $err // 0;
 
   foreach my $k ( keys %{$obj} ) {
@@ -787,85 +745,102 @@ sub validate_object {
 # | MAIN SCRIPT STARTS HERE |
 # +-------------------------+
 
-my %options = ( cleanup => 1 );
+sub main {
+  my %options = ( cleanup => 1 );
 
-GetOptions(
-  \%options,            'abstract|A=s',
-  'author|a=s',         'buildspec|b=s',
-  'build-requires|B=s', 'cleanup!',
-  'core-modules!',      'dryrun',
-  'debug|D',            'exe-files=s',
-  'help|h',             'log-level|l=s',
-  'module=s',           'require-versions!',
-  'requires|r=s',       'scandeps|s',
-  'test-requires=s',    'verbose|V',
-  'version|v',          'work-dir|w=s',
-);
+  GetOptions(
+    \%options,            'abstract|A=s',
+    'author|a=s',         'buildspec|b=s',
+    'build-requires|B=s', 'cleanup!',
+    'core-modules!',      'dryrun',
+    'debug|D',            'exe-files=s',
+    'help|h',             'log-level|l=s',
+    'module=s',           'require-versions!',
+    'requires|r=s',       'scandeps|s',
+    'test-requires=s',    'verbose|V',
+    'version|v',          'work-dir|w=s',
+  );
 
-if ( $options{help} ) {
-  help;
-}
-
-$options{'yaml-spec'} = get_yaml_specfile;
-
-if ( !exists $options{'require-versions'} ) {
-  $options{'require-versions'} = $TRUE;
-}
-
-if ( $options{'version'} ) {
-  print $PROGRAM_NAME . ' v' . $VERSION . $NL;
-
-  exit $SH_SUCCESS;
-}
-
-my $log_level = $options{'log-level'};
-
-if ($log_level) {
-  if ( $log_level =~ /^[1-5]$/ ) {
-    $log_level = ( $ERROR, $WARN, $INFO, $DEBUG, $TRACE )[ $log_level - 1 ];
-  }
-  else {
-    $log_level = {
-      ERROR => $ERROR,
-      WARN  => $WARN,
-      INFO  => $INFO,
-      DEBUG => $DEBUG,
-      TRACE => $TRACE,
-    }->{ uc $options{'log-level'} };
-  } ## end else [ if ( $log_level =~ /^[1-5]$/)]
-
-  if ( !$log_level ) {
-    $log_level = $ERROR;
+  if ( $options{help} ) {
+    help;
   }
 
-  Log::Log4perl->easy_init($log_level);
-} ## end if ($log_level)
+  $options{'yaml-spec'} = get_yaml_specfile;
 
-if ( $options{buildspec} ) {
-  my %args = parse_buildspec(%options);
+  if ( !exists $options{'require-versions'} ) {
+    $options{'require-versions'} = $TRUE;
+  }
+
+  if ( $options{'version'} ) {
+    print $PROGRAM_NAME . ' v' . $VERSION . $NL;
+
+    exit $SH_SUCCESS;
+  }
+
+  my $log_level = $options{'log-level'};
 
   if ($log_level) {
-    $args{'-L'} = {
-      $ERROR => 1,
-      $WARN  => 2,
-      $INFO  => 3,
-      $DEBUG => 4,
-      $TRACE => 5,
-    }->{$log_level};
+    if ( $log_level =~ /\A[1-5]\z$/xsm ) {
+      $log_level = ( $ERROR, $WARN, $INFO, $DEBUG, $TRACE )[ $log_level - 1 ];
+    }
+    else {
+      $log_level = {
+        ERROR => $ERROR,
+        WARN  => $WARN,
+        INFO  => $INFO,
+        DEBUG => $DEBUG,
+        TRACE => $TRACE,
+      }->{ uc $options{'log-level'} };
+    } ## end else [ if ( $log_level =~ /\A[1-5]\z$/xsm)]
+
+    if ( !$log_level ) {
+      $log_level = $ERROR;
+    }
+
+    Log::Log4perl->easy_init($log_level);
   } ## end if ($log_level)
 
-  if ( !$options{'dryrun'} ) {
-    exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;
-  }
-  else {
-    print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL;
-  }
-} ## end if ( $options{buildspec...})
-else {
-  write_makefile(%options);
-}
+  if ( $options{buildspec} ) {
+    my %args = parse_buildspec(%options);
 
-exit 0;
+    if ($log_level) {
+      $args{'-L'} = {
+        $ERROR => 1,
+        $WARN  => 2,
+        $INFO  => 3,
+        $DEBUG => 4,
+        $TRACE => 5,
+      }->{$log_level};
+    } ## end if ($log_level)
+
+    if ( !$options{'dryrun'} ) {
+      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;
+    }
+    else {
+      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL;
+    }
+  } ## end if ( $options{buildspec...})
+  else {
+    croak 'no module specified'
+      if !$options{'module'};
+
+    croak 'no dependencies'
+      if !$options{'requires'};
+
+    $options{'author'} = $options{'author'}
+      // 'Anonyous <anonymous@example.com>';
+    $options{'abstract'} = $options{'abstract'} // 'my awesome Perl module!';
+
+    if ( !write_makefile(%options) ) {
+      help();
+      exit $SH_FAILURE;
+    }
+  } ## end else [ if ( $options{buildspec...})]
+
+  exit $SH_SUCCESS;
+} ## end sub main
+
+1;
 
 __DATA__
 ---

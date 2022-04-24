@@ -455,7 +455,7 @@ else
         echo "${PROJECT_HOME}/${perl5libdir}/$module_file" >$package_files
     fi
 fi
-
+   
 for a in $(cat $package_files | sort -u); do
     DEBUG "provides: [$a]"
     
@@ -519,33 +519,40 @@ if test -z "$dependency_file"; then
     get_module_versions ${workdir}/requires.tmp > ${workdir}/requires
 fi
 
+if test -n "$testsdir"; then
+    if test -d "$testsdir"; then
+        testsfile=$(mktemp);
+        ls -1 ${testsdir}/*.t >$testsfile 2>/dev/null || true
+        
+        if ! test -s "$testsfile"; then
+            INFO "no tests found in [$testsdir]...proceeding anyway."
+            rm "$testsfile"
+            testsfile=""
+        fi
+        
+        mkdir ${builddir}/t
+        for a in $(cat $testsfile); do
+            cp $PROJECT_HOME/$a ${builddir}/t/
+        done
+    else
+        FATAL_ERROR "no test directory [$testsdir]"
+    fi
+fi
+
 if test -n "$test_dependency_file"; then
     cp $test_dependency_file ${workdir}/test-requires.tmp
     cp ${workdir}/test-requires.tmp ${workdir}/test-requires
 else
-    if test -n "$testsdir"; then
-        if test -d "$testsdir"; then
-            testsfile=$(mktemp);
-            ls -1 ${testsdir}/*.t >$testsfile 2>/dev/null || true
-            if test -s "$testsfile"; then
-                mkdir ${builddir}/t
+    for a in $(cat $testsfile); do
+        scan $PROJECT_HOME/$a ${workdir}/test-requires.tmp
+    done
                 
-                for a in $(cat $testsfile); do
-                    cp $PROJECT_HOME/$a ${builddir}/t/
-                    scan $PROJECT_HOME/$a ${workdir}/test-requires.tmp
-                done
-                
-                # remove provided files from required list
-                sort -u ${workdir}/test-requires.tmp > ${workdir}/test-requires
-                comm -23 ${workdir}/test-requires ${workdir}/provides > ${workdir}/test-requires.tmp
-                # get module versions for test-requires
-                get_module_versions test-requires.tmp > ${workdir}/test-requires
-            else
-                rm -f "$testsfile";
-                testsfile="";
-            fi
-        fi
-    fi
+    # remove provided files from required list
+    sort -u ${workdir}/test-requires.tmp > ${workdir}/test-requires
+    comm -23 ${workdir}/test-requires ${workdir}/provides > ${workdir}/test-requires.tmp
+    
+    # get module versions for test-requires
+    get_module_versions test-requires.tmp > ${workdir}/test-requires
 fi
 
 test -n "$VERBOSE" && cat ${workdir}/requires

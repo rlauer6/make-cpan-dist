@@ -11,16 +11,30 @@ perlwc = @ENV@ @PERL@
 ax_perl5_extra_includes_opt = @ax_perl5_extra_includes_opt@
 ax_perl5_extra_includes = @ax_perl5_extra_includes@
 
-PERLMODULES = \
+FILE_PERLMODULES = \
     File/Process.pm.in
 
-GPERLMODULES = $(PERLMODULES:.pm.in=.pm)
-G3MANPAGES = $(GPERLSCRIPTS:.pm=.3man)
+CPAN_PERLMODULES = \
+    CPAN/Maker/Utils.pm.in \
+    CPAN/Maker/Constants.pm.in
+
+PERLMODULES = \
+    $(FILE_PERLMODULES) \
+    $(CPAN_PERLMODULES)
+
+GFILE_PERLMODULES = $(FILE_PERLMODULES:.pm.in=.pm)
+GCPAN_PERLMODULES = $(CPAN_PERLMODULES:.pm.in=.pm)
+GPERLMODULES      = $(PERLMODULES:.pm.in=.pm)
+
+G3MANPAGES = $(GPERLMODULES:.pm=.3man)
 
 filedir = $(perl5libdir)/File
-file_DATA = $(GPERLMODULES)
+file_DATA = $(GFILE_PERLMODULES)
 
-dist_noinst_DATA = $(PERLMODULES)
+cpan_makerdir = $(perl5libdir)/CPAN/Maker
+cpan_maker_DATA = $(GCPAN_PERLMODULES)
+
+dist_noinst_DATA = $(FILE_PERLMODULES) $(CPAN_PERLMODULES)
 
 man3_MANS = $(G3MANPAGES)
 
@@ -38,12 +52,15 @@ PERLINCLUDE = \
     $(PERL5_EXTRA_INCLUDES) \
     -I $(perl5libdir)
 
-$(GPERLMODULES): % : %.in 
+%.pm: %.pm.in
 	test -d "$$(dirname "$@")" || $(INSTALL) -d "$$(dirname "$@")"
 	$(do_subst) $< > $@
 	$(perlwc) $(PERLINCLUDE) -wc $@ || { rm $@ && exit 1; }
 
-all:
+CPAN/Maker/Utils.pm: CPAN/Maker/Utils.pm.in CPAN/Maker/Constants.pm
+	test -d "$$(dirname "$@")" || $(INSTALL) -d "$$(dirname "$@")"
+	$(do_subst) $< > $@
+	$(perlwc) $(PERLINCLUDE) -wc $@ || { rm $@ && exit 1; }
 
 CLEANFILES = $(GPERLMODULES)
 
@@ -64,7 +81,7 @@ clean-local:
 
 .PHONY: clean-generated-man-pages
 clean-generated-man-pages:
-	for f in *.3man; do \
+	for f in $$(find . -name '*.3man'); do \
 	  echo "$$f"; \
 	  rm -f "$$f" ;\
 	done

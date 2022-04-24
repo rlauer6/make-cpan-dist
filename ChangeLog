@@ -1,3 +1,22 @@
+Sun Apr 24 05:25:42 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.9 - refactoring]:
+	* VERSION: bump
+	* configure.ac: don't treat warnings as errors
+	* .gitignore: +man pages, tar balls
+	* src/main/bash/bin/make-cpan-dist.in
+	- cp tests when there is a test dependency file
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- converted to module
+	- refactor utilities and constants to separate modules
+	(get_provides): refactor, use utils, perlcritic fixes
+	(write_makefile): likewise
+	(get_requires): likewise
+	* src/main/perl/lib/CPAN/Maker/Constants.pm.in: new
+	* src/main/perl/lib/CPAN/Maker/Utils.pm.in: new
+	* src/main/perl/lib/Makefile.am
+	- add above to build
+
 Mon Apr 18 14:28:38 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.8 - pod, perlcritic cleanup]:

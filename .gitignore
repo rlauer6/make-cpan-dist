@@ -1,3 +1,5 @@
+**/*.tar.gz
+**/*.3man
 **/*.1man
 autotools/*
 aclocal.m4
