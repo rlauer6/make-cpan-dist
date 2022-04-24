@@ -333,7 +333,7 @@ END_OF_TEXT
 
   DEBUG sub { return $MAKEFILE };
 
-  return $SH_SUCCESS;
+  return $SUCCESS;
 } ## end sub write_makefile
 
 ########################################################################
