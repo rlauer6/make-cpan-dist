@@ -7,9 +7,9 @@ package CPAN::Maker;
 use strict;
 use warnings;
 
-use Carp;
 use CPAN::Maker::Constants qw{ :all };
 use CPAN::Maker::Utils qw{ :all };
+use Carp;
 use Data::Dumper;
 use English qw{ -no_match_vars };
 use ExtUtils::MM;
@@ -22,7 +22,6 @@ use JSON::PP qw{ encode_json decode_json };
 use List::Util qw{ pairs };
 use Log::Log4perl qw{ :easy };
 use Log::Log4perl::Level;
-
 use Pod::Usage;
 use Scalar::Util qw{ reftype };
 use YAML::Tiny;
@@ -719,24 +718,29 @@ sub validate_object {
 
   $err = $err // 0;
 
-  foreach my $k ( keys %{$obj} ) {
-    if ( !exists $spec->{$k} ) {
-      warn "ERROR: not a valid key ($k)\n";
-      $err++;
-    }
-
-    if ( ref $spec->{$k} ) {
-      if ( !ref( $obj->{$k} )
-        || reftype( $obj->{$k} ) ne reftype( $spec->{$k} ) ) {
-        warn "ERROR: wrong type for ($k) - $k must be "
-          . reftype( $spec->{$k} ) . "\n";
+  if ( reftype($obj) eq 'HASH' ) {
+    foreach my $k ( keys %{$obj} ) {
+      if ( !exists $spec->{$k} ) {
+        warn "ERROR: not a valid key ($k)\n" . Dumper [ $k, $spec ];
         $err++;
-      } ## end if ( !ref( $obj->{$k} ...))
-      else {
-        validate_object( $obj->{$k}, $spec->{$k}, $err );
       }
-    } ## end if ( ref $spec->{$k} )
-  } ## end foreach my $k ( keys %{$obj...})
+
+      if ( ref $spec->{$k} ) {
+        if ( !ref $obj->{$k}
+          || reftype( $obj->{$k} ) ne reftype( $spec->{$k} ) ) {
+          warn "ERROR: wrong type for ($k) - $k must be "
+            . reftype( $spec->{$k} ) . "\n";
+          $err++;
+        } ## end if ( !ref $obj->{$k} ||...)
+        else {
+          validate_object( $obj->{$k}, $spec->{$k}, $err );
+        }
+      } ## end if ( ref $spec->{$k} )
+    } ## end foreach my $k ( keys %{$obj...})
+  } ## end if ( reftype($obj) eq ...)
+  else {    # just validate arrays are arrays for now, deep dive TBD
+    $err = reftype($spec) eq 'ARRAY';
+  }
 
   return $err ? $FALSE : $TRUE;
 } ## end sub validate_object
