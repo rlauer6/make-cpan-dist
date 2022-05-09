@@ -237,6 +237,9 @@ sub write_makefile {
   if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
     $test_req = Dumper get_requires( $options{'test-requires'}, $core );
   }
+  else {
+    $test_req = '{}';
+  }
 
   $test_req = trim($test_req);
 

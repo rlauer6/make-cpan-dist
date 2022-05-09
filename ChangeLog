@@ -1,3 +1,13 @@
+Mon May  9 11:13:09 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.12 - bash script bug]:
+	* configure.ac: add dependencies :-)
+	* src/main/bash/bin/make-cpan-dist.in
+	- skip test-requires output if no tests
+	(perl_requires): cat requires file if provided
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(write_makefile): TESTREQUIRES = '{}' if no tests
+
 Wed Apr 27 14:45:52 2022  Rob Lauer  <rclauer@gmail.com>
 
 	[1.5.11 - validate arrays]:

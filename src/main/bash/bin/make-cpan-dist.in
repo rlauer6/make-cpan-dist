@@ -139,7 +139,12 @@ function cleanup {
 ########################################################################
 function perl_requires {
 ########################################################################
-    if test -n "@PERL_REQUIRES@"; then
+
+    if test -n "$REQUIRES"; then
+        if test -e "$REQUIRES"; then
+            cat $REQUIRES
+        fi
+    elif test -n "@PERL_REQUIRES@"; then
         /usr/lib/rpm/perl.req "$1" | perl -npe 's/^perl\((.*)\)/$1/'
     else
         ERROR "no /usr/lib/rpm/perl.req found!"
@@ -291,7 +296,8 @@ while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:c" arg "$@"; do
 
 
         r)
-            PERL_REQUIRES="$OPTARG";
+            PERL_REQUIRES="perl_requires";
+            REQUIRES="$OPTARG"
             ;;
 
         s)
@@ -543,26 +549,31 @@ if test -n "$test_dependency_file"; then
     cp $test_dependency_file ${workdir}/test-requires.tmp
     cp ${workdir}/test-requires.tmp ${workdir}/test-requires
 else
-    for a in $(cat $testsfile); do
-        scan $PROJECT_HOME/$a ${workdir}/test-requires.tmp
-    done
+    if test -n "$testsfile"; then
+        for a in $(cat $testsfile); do
+            scan $PROJECT_HOME/$a ${workdir}/test-requires.tmp
+        done
                 
-    # remove provided files from required list
-    sort -u ${workdir}/test-requires.tmp > ${workdir}/test-requires
-    comm -23 ${workdir}/test-requires ${workdir}/provides > ${workdir}/test-requires.tmp
+        # remove provided files from required list
+        sort -u ${workdir}/test-requires.tmp > ${workdir}/test-requires
+        comm -23 ${workdir}/test-requires ${workdir}/provides > ${workdir}/test-requires.tmp
     
-    # get module versions for test-requires
-    get_module_versions test-requires.tmp > ${workdir}/test-requires
+        # get module versions for test-requires
+        get_module_versions test-requires.tmp > ${workdir}/test-requires
+    fi
 fi
 
 test -n "$VERBOSE" && cat ${workdir}/requires
 test -n "$VERBOSE" && test -e ${workdir}/test-requires && cat ${workdir}/test-requires
 
+if test -n "$testsfile"; then
+    TESTREQUIRES="-t ${workdir}/test-requires"
+fi
+
 # create the Makefile.PL
 if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             $CORE_MODULES $BUILD_REQUIRES -r ${workdir}/requires \
-            -e $exe_files \
-            -t ${workdir}/test-requires \
+            -e $exe_files $TESTREQUIRES \
             -w ${builddir} \
             -l $LOG_LEVEL \
             -m "$MODULE" \

@@ -148,6 +148,9 @@ AC_SUBST([perl5libdir])
 
 dnl something just to make autoconf include the autotools/ads_ stuff in the distribution
 ads_PERL_MODULE([Getopt::Long])
+ads_PERL_MODULE([YAML::Tiny])
+ads_PERL_MODULE([Log::Log4perl])
+ads_PERL_MODULE([ReadonlyX])
 
 dnl example using the PERL_MODULE check with a version number
 dnl ads_PERL_MODULE([Bedrock], [REQUIRE], [1.3])
