@@ -1,3 +1,9 @@
+Fri Jun 17 08:31:32 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.13 - buildspec failure]:
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- removed elements in buildspec definition for extra-files
+
 Mon May  9 11:13:09 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.12 - bash script bug]:
