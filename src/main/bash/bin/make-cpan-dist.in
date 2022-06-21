@@ -145,7 +145,7 @@ function perl_requires {
             cat $REQUIRES
         fi
     elif test -n "@PERL_REQUIRES@"; then
-        $PERL_REQUIRES -r "$1" 
+        "@PERL_REQUIRES@" -r "$1" 
     else
         ERROR "no scandeps-static.pl found!"
         FATAL_ERROR "Install Module::ScanDeps::Static use the -r option to provide your own dependency checker"
@@ -515,7 +515,7 @@ cat ${workdir}/provides.tmp | perl -npe 's/\//::/g; s/\.pm$//;' | sort -u > ${wo
 # echo "$(get_module_versions ${workdir}/provides)" > ${workdir}/provides
 
 has_perl_version=$(cat ${workdir}/requires.tmp | grep '^perl' | awk '{print $2}')
-awk '{print $1}' ${workdir}/requires.tmp | sort -u | grep -v '^perl' > ${workdir}/requires
+awk '{print $1 " " $2}' ${workdir}/requires.tmp | sort -u | grep -v '^perl' > ${workdir}/requires
 
 # remove provided files from required list
 comm -23 ${workdir}/requires ${workdir}/provides > ${workdir}/requires.tmp

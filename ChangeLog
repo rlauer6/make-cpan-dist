@@ -1,3 +1,9 @@
+Tue Jun 21 12:44:35 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.15 - module versions]:
+	* src/main/perl/bin/make-cpan-dist.in
+	- support requires files w/version numbers
+
 Tue Jun 21 07:37:36 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.14 - min-perl-version]:
