@@ -145,10 +145,10 @@ function perl_requires {
             cat $REQUIRES
         fi
     elif test -n "@PERL_REQUIRES@"; then
-        /usr/lib/rpm/perl.req "$1" | perl -npe 's/^perl\((.*)\)/$1/'
+        $PERL_REQUIRES -r "$1" 
     else
-        ERROR "no /usr/lib/rpm/perl.req found!"
-        FATAL_ERROR "Install rpm-build package or use the -r option to provide your own dependency checker"
+        ERROR "no scandeps-static.pl found!"
+        FATAL_ERROR "Install Module::ScanDeps::Static use the -r option to provide your own dependency checker"
     fi
 }
 
@@ -205,7 +205,7 @@ function scan() {
             fi
         fi
     else
-        $PERL_REQUIRES $scan_target >> $requires_file
+        scandeps-static.pl -r $scan_target >> $requires_file
         DEBUG $(echo "SCAN:" && cat $requires_file)
     fi
 }
@@ -514,7 +514,8 @@ cat ${workdir}/provides.tmp | perl -npe 's/\//::/g; s/\.pm$//;' | sort -u > ${wo
 # should we resolve versions here or in Perl module?
 # echo "$(get_module_versions ${workdir}/provides)" > ${workdir}/provides
 
-sort -u ${workdir}/requires.tmp > ${workdir}/requires
+has_perl_version=$(cat ${workdir}/requires.tmp | grep '^perl' | awk '{print $2}')
+awk '{print $1}' ${workdir}/requires.tmp | sort -u | grep -v '^perl' > ${workdir}/requires
 
 # remove provided files from required list
 comm -23 ${workdir}/requires ${workdir}/provides > ${workdir}/requires.tmp
@@ -568,6 +569,10 @@ test -n "$VERBOSE" && test -e ${workdir}/test-requires && cat ${workdir}/test-re
 
 if test -n "$testsfile"; then
     TESTREQUIRES="-t ${workdir}/test-requires"
+fi
+
+if test -n "$has_perl_version"; then
+    min_perl_version="--min-perl-version $has_perl_version"
 fi
 
 # create the Makefile.PL

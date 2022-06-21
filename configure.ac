@@ -103,10 +103,10 @@ if test -z "$ENV" ; then
 fi
 
 AC_PATH_PROG([PERL_REQUIRES],
-	[perl.req],[],[$PATH$PATH_SEPARATOR/usr/lib/rpm])
+	[scandeps-static.pl])
 
 if test -z "$PERL_REQUIRES" ; then 
-  AC_MSG_WARN([perl.req not found?])
+  AC_MSG_WARN([scandeps-static.pl not found?])
 fi
 
 AC_PATH_PROG([SCANDEPS],

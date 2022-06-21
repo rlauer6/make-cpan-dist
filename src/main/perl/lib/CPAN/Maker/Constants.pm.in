@@ -30,7 +30,17 @@ Readonly our $NL           => qq{\n};
 Readonly our $SLASH        => q{/};
 Readonly our $SPACE        => q{ };
 
+# defaults
+Readonly our $DEFAULT_PERL_VERSION => '5.010';
+Readonly our $NO_VERSION           => 0;
+
 our %EXPORT_TAGS = (
+  'defaults' => [
+    qw{
+      $DEFAULT_PERL_VERSION
+      $NO_VERSION
+    }
+  ],
   'booleans' => [
     qw{
       $TRUE
@@ -58,7 +68,7 @@ our %EXPORT_TAGS = (
 
 foreach my $k ( keys %EXPORT_TAGS ) {
   push @EXPORT_OK, @{ $EXPORT_TAGS{$k} };
-}
+} ## end foreach my $k ( keys %EXPORT_TAGS)
 
 $EXPORT_TAGS{'all'} = [@EXPORT_OK];
 

@@ -1,3 +1,19 @@
+Tue Jun 21 07:37:36 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.14 - min-perl-version]:
+	* VERSION: bump
+	* src/main/bash/bin/make-cpan-dist.in
+	- use scandeps-static.pl
+	* configure.ac: test for scandeps-static.pl
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- use version
+	(write_makefile): MIN_PERL_VERSION
+	(main): --min-perl-version
+	* src/main/perl/lib/CPAN/Maker/Utils.pm.in
+	(get_requires): pass min version of perl
+	* src/main/perl/lib/CPAN/Maker/Constants.pm.in
+	- +$DEFAULT_PERL_VERSION, $NO_VERSION
+
 Fri Jun 17 08:31:32 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.13 - buildspec failure]:
