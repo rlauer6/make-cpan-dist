@@ -1,3 +1,12 @@
+Wed Jul 13 16:14:24 2022  Rob Lauer  <rlauer@usgn.net>
+
+	[1.5.16 - no-core]:
+	* src/main/bash/bin/make-cpan-dist.in
+	- don't overwrite requires
+	(scan)
+	- add --no-core option if ---no-core-modules
+	- just take modules, not version, version will be determined later
+
 Tue Jun 21 12:44:35 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.15 - module versions]:
