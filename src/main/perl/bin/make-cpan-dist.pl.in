@@ -320,11 +320,11 @@ WriteMakefile(
   EXE_FILES      => $exe_files,
   PREREQ_PM      => $pre_req,
   BUILD_REQUIRES => {
-    'ExtUtils::MakeMaker'     => $NO_VERSION,
+    'ExtUtils::MakeMaker'     => '6.64',
     'File::ShareDir::Install' => $NO_VERSION,
     },
   CONFIGURE_REQUIRES => {
-    'ExtUtils::MakeMaker'     => $NO_VERSION,
+    'ExtUtils::MakeMaker'     => '6.64',
     'File::ShareDir::Install' => $NO_VERSION,
     },
   TEST_REQUIRES => $test_req,
