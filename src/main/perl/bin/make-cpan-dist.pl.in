@@ -95,6 +95,35 @@ sub get_exe_file_list {
 } ## end sub get_exe_file_list
 
 ########################################################################
+sub get_perl_version {
+########################################################################
+  my ($requires) = @_;
+
+  my $version;
+
+  if ( !-e $requires ) {
+    return;
+  }
+
+  process_file(
+    $requires,
+    chomp   => $TRUE,
+    process => sub {
+      my $module = pop @_;
+
+      if ( $module !~ /^perl\s+/xsm ) {
+        return ();
+      }
+
+      ( undef, $version ) = split /\s+/xsm, $module;
+      return;
+    }
+  );
+
+  return $version;
+}
+
+########################################################################
 sub get_provides {
 ########################################################################
   my ( $file, %options ) = @_;
@@ -226,9 +255,9 @@ sub write_makefile {
   local $Data::Dumper::Pad      = $SPACE x $INDENT;
 
   # dependencies
-  foreach my $d (qw{requires test-requires build-require }) {
+  foreach my $d (qw{requires test-requires build-requires }) {
     $options{$d} = $options{$d} || $d;
-  } ## end foreach my $d (qw{requires test-requires build-require })
+  }
 
   my $pre_req = Dumper get_requires( $options{'requires'}, $core,
     $options{'min-perl-version'} );
@@ -665,6 +694,7 @@ sub get_requires {
       my ( $fh, $all_lines, $args, $line ) = @_;
       $line = filter( $fh, $all_lines, $args, $line );
 
+      return ()    if $line =~ /^perl\s+/xsm;
       return $line if !defined $line;
       return $line if $core_modules;
       return $line if $line =~ /^[+]/xsm;
@@ -788,7 +818,11 @@ sub main {
       = version->parse( $options{'min-perl-version'} )->stringify;
   } ## end if ( $options{'min-perl-version'...})
   else {
-    $options{'min-perl-version'} = $DEFAULT_PERL_VERSION;
+    if ( $options{requires} ) {
+      $options{'min-perl-version'} = get_perl_version( $options{requires} );
+    }
+
+    $options{'min-perl-version'} //= $DEFAULT_PERL_VERSION;
   } ## end else [ if ( $options{'min-perl-version'...})]
 
   if ( !exists $options{'require-versions'} ) {

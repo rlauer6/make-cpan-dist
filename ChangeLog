@@ -1,3 +1,10 @@
+Thu Jul 28 15:00:15 2022  Rob Lauer  <rlauer@usgn.net>
+
+	[1.5.18 - perl version]:
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(get_perl_version): new
+	(main): get perl version from requires
+
 Fri Jul 22 08:54:47 2022  Rob Lauer  <rlauer@usgn.net>
 
 	[1.5.17 - ExtUtils::MakeMaker]:
