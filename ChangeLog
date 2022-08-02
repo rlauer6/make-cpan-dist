@@ -1,3 +1,11 @@
+Tue Aug  2 07:50:29 2022  Rob Lauer  <rlauer@usgn.net>
+
+	[1.5.19 - versions]:
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(write_makefile):
+	- == version, not @ version
+	- do not add a minium version of perl by default
+
 Thu Jul 28 15:00:15 2022  Rob Lauer  <rlauer@usgn.net>
 
 	[1.5.18 - perl version]:
