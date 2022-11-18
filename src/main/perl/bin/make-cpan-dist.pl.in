@@ -9,7 +9,9 @@ use warnings;
 
 use CPAN::Maker::Constants qw{ :all };
 use CPAN::Maker::Utils qw{ :all };
+
 use Carp;
+use Cwd;
 use Data::Dumper;
 use English qw{ -no_match_vars };
 use ExtUtils::MM;
@@ -51,6 +53,7 @@ OPTIONS
 -l, --log-level           ERROR, WARN, INFO, DEBUG, TRACE
 -m, --module              module name
 -M, --module-list         list of modules to include in distribution
+-p, --project-root        default: current working directory
 -r, --requires            dependency list
 -R, --require-versions    add version numbers to dependencies
     --no-require-versions
@@ -70,7 +73,39 @@ Version: $VERSION
 
 END_OF_TEXT
   return $SH_FAILURE;
-} ## end sub help
+}
+
+########################################################################
+sub _is_obj {
+########################################################################
+  my ( $this, $type ) = @_;
+
+  return ref $this && reftype($this) eq $type;
+}
+
+########################################################################
+sub is_array {
+########################################################################
+  my ($this) = @_;
+
+  return _is_obj( $this, 'ARRAY' );
+}
+
+########################################################################
+sub is_scalar {
+########################################################################
+  my ($this) = @_;
+
+  return !ref $this;
+}
+
+########################################################################
+sub is_hash {
+########################################################################
+  my ($this) = @_;
+
+  return _is_obj( $this, 'HASH' );
+}
 
 ########################################################################
 sub get_exe_file_list {
@@ -89,10 +124,10 @@ sub get_exe_file_list {
         return $f;
       }
     );
-  } ## end if ($file)
+  }
 
   return $lines ? @{$lines} : ();
-} ## end sub get_exe_file_list
+}
 
 ########################################################################
 sub get_perl_version {
@@ -142,13 +177,13 @@ sub get_provides {
 
         if ( !$module ) {
           return ();
-        } ## end if ( !$module )
+        }
 
         my $include_path = $args->{'prefix'};
 
         if ( $options{'work-dir'} ) {
           $include_path = $options{'work-dir'} . $SLASH . $include_path;
-        } ## end if ( $options{'work-dir'...})
+        }
 
         my $module_version = get_module_version( $module, $include_path );
 
@@ -166,15 +201,15 @@ sub get_provides {
         return $provided_module;
       }
     );
-  } ## end if ($file)
+  }
   return %provides;
-} ## end sub get_provides
+}
 
 ########################################################################
 sub get_resources {
 ########################################################################
   goto &get_json_file;
-} ## end sub get_resources
+}
 
 ########################################################################
 sub get_json_file {
@@ -188,7 +223,7 @@ sub get_json_file {
   );
 
   return decode_json($json);
-} ## end sub get_json_file
+}
 
 ########################################################################
 sub write_resources {
@@ -207,10 +242,10 @@ sub write_resources {
 
     close $fh
       or croak "could not close file $resources_file\n";
-  } ## end if ($resources)
+  }
 
   return %args;
-} ## end sub write_resources
+}
 
 ########################################################################
 sub write_provides {
@@ -227,16 +262,16 @@ sub write_provides {
 
     foreach my $file ( @{$provides} ) {
       print {$fh} "$file\n";
-    } ## end foreach my $file ( @{$provides...})
+    }
 
     close $fh
       or croak "could not close 'provides'\n";
 
     $args{P} = $provides_file;
-  } ## end if ($provides)
+  }
 
   return %args;
-} ## end sub write_provides
+}
 
 ########################################################################
 sub write_makefile {
@@ -269,10 +304,10 @@ sub write_makefile {
   if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
     $test_req = Dumper get_requires( $options{'test-requires'},
       $core, $options{'min-perl-version'} );
-  } ## end if ( $options{'test-requires'...})
+  }
   else {
     $test_req = '{}';
-  } ## end else [ if ( $options{'test-requires'...})]
+  }
 
   $test_req = trim($test_req);
   $test_req =~ s/\@(\d+)/== $1/xsmg;
@@ -283,11 +318,11 @@ sub write_makefile {
     $build_req = Dumper get_requires( $options{'build-requires'},
       $TRUE, $options{'min-perl-version'} );
     $build_req = trim($build_req);
-  } ## end if ( $options{'build-requires'...})
+  }
 
   foreach my $m (qw{ ExtUtils::MakeMaker File::ShareDir::Install}) {
     $build_req->{$m} = $build_req->{$m} || $FALSE;
-  } ## end foreach my $m (qw{ ExtUtils::MakeMaker File::ShareDir::Install})
+  }
 
   $build_req = Dumper $build_req;
 
@@ -295,7 +330,7 @@ sub write_makefile {
 
   if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
     @exe_file_list = get_exe_file_list( $options{'exe-files'} );
-  } ## end if ( $options{'exe-files'...})
+  }
 
   my $exe_files = Dumper \@exe_file_list;
 
@@ -303,13 +338,13 @@ sub write_makefile {
 
   if ( -e 'provides' ) {
     %provides = get_provides( 'provides', %options );
-  } ## end if ( -e 'provides' )
+  }
 
   my $resources;
 
   if ( -e 'resources' ) {
     $resources = get_resources('resources');
-  } ## end if ( -e 'resources' )
+  }
 
   my $META_MERGE = 'META_MERGE ' . $FAT_ARROW;
 
@@ -378,92 +413,112 @@ END_OF_TEXT
   DEBUG sub { return $MAKEFILE };
 
   return $SUCCESS;
-} ## end sub write_makefile
+}
 
 ########################################################################
 sub write_file_list {
 ########################################################################
-  my ( $file_list, $destdir ) = @_;
+  my (%args) = @_;
+
+  my ( $file_list, $destdir, $project_root )
+    = @args{qw{file_list destination project_root}};
 
   my @expanded_list;
 
-  for my $f ( @{$file_list} ) {
-    if ( -d $f ) {
+  foreach my $f ( @{$file_list} ) {
+    my $fqp = sprintf '%s/%s', $project_root, $f;
+
+    DEBUG Dumper( [ 'write_file_list:', $fqp ] );
+
+    if ( -d $fqp ) {
       find(
         sub {
           if ( !/^[.]+$/xsm ) {
             push @expanded_list, "$File::Find::name $destdir/$_";
-          } ## end if ( !/^[.]+$/xsm )
+          }
         },
-        $f
+        $fqp
       );
-    } ## end if ( -d $f )
+    }
     else {
       # the intent is to cp files to root of distribution (not
       # to install the files during package installation...the
       # exception being if items are installed into share
       # directory
-      my ( $name, $path, $ext ) = fileparse( $f, qr/[.][^.]*/xsm );
-      push @expanded_list, "$f $destdir/$name$ext\n";
-    } ## end else [ if ( -d $f ) ]
-  } ## end for my $f ( @{$file_list...})
+      my ( $name, $path, $ext ) = fileparse( $fqp, qr/[.][^.]*/xsm );
+      push @expanded_list, sprintf "%s %s%s%s%s\n", $fqp, $destdir, $name,
+        $ext;
+    }
+  }
 
   return @expanded_list;
-} ## end sub write_file_list
+}
 
 # file name or hash
 # extra-files:
 #   share:
-#     - ../README.md
-#     - ../ChangeLog
-#   examples: ../src/examples
+#     - README.md
+#     - ChangeLog
+#   examples: src/examples
 # extra-files:
 #   - file
 
 ########################################################################
 sub write_extra_files {
 ########################################################################
-  my ( $extra_files, $extra, %args ) = @_;
+  my (%params) = @_;
 
-  return %args
-    if !ref $extra_files || reftype($extra_files) ne 'ARRAY';
+  DEBUG('writing extra-files');
+
+  my ( $extra_files, $extra, $project_root )
+    = @params{qw{extra_files extra project_root}};
+
+  my %args = %{ $params{args} };
+
+  if ( !is_array($extra_files) ) {
+    croak "extra-files must be an array!\n"
+      . Dumper( [ $extra_files, \%params ] );
+  }
 
   my $extra_files_path = $extra || 'extra-files';
 
   my @file_list;
 
   foreach my $e ( @{$extra_files} ) {
+    DEBUG Dumper( [$e] );
 
-    if ( !ref $e ) {
+    if ( !ref $e ) { # simple file
       push @file_list, $e;
-    } ## end if ( !ref $e )
-    elsif ( reftype($e) eq 'HASH' ) {
-      my ($destdir) = keys %{$e};
+    }
+    elsif ( is_hash($e) ) { # possibly dest => dir, or dest => list
+      foreach my $destdir ( keys %{$e} ) {
+        my ($destdir) = keys %{$e};
 
-      if ( $destdir !~ /\/$/xsm ) {
-        $destdir .= $SLASH;
-      } ## end if ( $destdir !~ /\/$/xsm)
+        my $file_list = $e->{$destdir};
 
-      my $file_list = $e;
+        if ( is_scalar $file_list ) {
+          $file_list = [$file_list];
+        }
+        elsif ( !is_array ) {
+          croak 'extra-files args can only be scalar or list';
+        }
 
-      if ( ref($file_list) && reftype($file_list) ne 'ARRAY' ) {
-        $file_list = [ values %{$file_list} ];
-      } ## end if ( ref($file_list) &&...)
-      elsif ( !ref $file_list ) {
-        $file_list = [$file_list];
-      } ## end elsif ( !ref $file_list )
-
-      push @file_list, write_file_list( $file_list, $destdir );
-
-    } ## end elsif ( reftype($e) eq 'HASH')
-  } ## end foreach my $e ( @{$extra_files...})
+        push @file_list,
+          write_file_list(
+          file_list    => $file_list,
+          destination  => $destdir,
+          project_root => $project_root,
+          );
+      }
+    }
+  }
 
   open my $fh, '>', $extra_files_path
     or croak "could not append to $extra_files_path\n";
 
   foreach my $f (@file_list) {
     print {$fh} "$f\n";
-  } ## end foreach my $f (@file_list)
+  }
 
   close $fh
     or croak "could not close $extra_files_path\n";
@@ -471,7 +526,7 @@ sub write_extra_files {
   $args{f} = $extra_files_path;
 
   return %args;
-} ## end sub write_extra_files
+}
 
 ########################################################################
 sub parse_path {
@@ -482,28 +537,34 @@ sub parse_path {
     if ( $path->{'recurse'}
       && $path->{'recurse'} =~ /(yes|no)/ixsm ) {
       $args{R} = $path->{'recurse'};
-    } ## end if ( $path->{'recurse'...})
+    }
     elsif ( $path->{'recurse'} ) {
       croak "use only yes or no for 'recurse' option\n";
-    } ## end elsif ( $path->{'recurse'...})
+    }
 
     # -l
     if ( $path->{'pm_module'} ) {
       $args{l} = $path->{'pm_module'};
-    } ## end if ( $path->{'pm_module'...})
+    }
 
     # -e
     if ( $path->{'exe_files'} ) {
       $args{e} = $path->{'exe_files'};
-    } ## end if ( $path->{'exe_files'...})
+    }
+
+    # -S
+    if ( $path->{'scripts'} ) {
+      $args{S} = $path->{'scripts'};
+    }
 
     # -t
     if ( $path->{'tests'} ) {
       $args{t} = $path->{'tests'};
-    } ## end if ( $path->{'tests'} )
-  } ## end if ($path)
+    }
+  }
+
   return %args;
-} ## end sub parse_path
+}
 
 ########################################################################
 sub parse_dependencies {
@@ -515,40 +576,40 @@ sub parse_dependencies {
     if ( $dependencies->{'path'} ) { # deprecatd
       $args{D} = $dependencies->{'path'};
       warn "path is deprecated: use requires\n";
-    } ## end if ( $dependencies->{'path'...})
+    }
 
     if ( $dependencies->{'requires'} ) {
       $args{D} = $dependencies->{'requires'};
-    } ## end if ( $dependencies->{'requires'...})
+    }
 
     if ( $dependencies->{'test_requires'} ) {
       $args{T} = $dependencies->{'test_requires'};
-    } ## end if ( $dependencies->{'test_requires'...})
+    }
 
     if ( $dependencies->{'build_requires'} ) {
       $args{B} = $dependencies->{'build_requires'};
-    } ## end if ( $dependencies->{'build_requires'...})
+    }
 
     if ( $dependencies->{'core_modules'} eq 'yes' ) {
       $args{c} = $EMPTY;
-    } ## end if ( $dependencies->{'core_modules'...})
+    }
 
     if ( my $resolver = $dependencies->{'resolver'} ) {
       if ( $resolver eq 'scandeps' ) {
         $args{s} = $EMPTY;
-      } ## end if ( $resolver eq 'scandeps')
+      }
       else {
         $args{r} = $dependencies->{'resolver'};
-      } ## end else [ if ( $resolver eq 'scandeps')]
-    } ## end if ( my $resolver = $dependencies...)
+      }
+    }
 
     if ( $args{D} && $args{r} ) {
       croak "use either path or resolver for dependencies, but not both\n";
-    } ## end if ( $args{D} && $args...)
-  } ## end if ($dependencies)
+    }
+  }
 
   return %args;
-} ## end sub parse_dependencies
+}
 
 ########################################################################
 sub parse_include_version {
@@ -558,10 +619,10 @@ sub parse_include_version {
   if ( defined $version ) {
     if ( $version =~ /(no|0|off)/xsm ) {
       $args{A} = $EMPTY;
-    } ## end if ( $version =~ /(no|0|off)/xsm)
-  } ## end if ( defined $version )
+    }
+  }
   return %args;
-} ## end sub parse_include_version
+}
 
 ########################################################################
 sub parse_project {
@@ -574,24 +635,24 @@ sub parse_project {
 
       if ( $project->{'author'}->{'mailto'} ) {
         $args{a} .= ' <' . $project->{'author'}->{'mailto'} . '>';
-      } ## end if ( $project->{'author'...})
+      }
 
       $args{a} = sprintf q{'%s'}, $args{a};
-    } ## end if ( $project->{'author'...})
+    }
 
     # -d
     if ( $project->{'description'} ) {
       $args{d} = sprintf q{'%s'}, $project->{'description'};
-    } ## end if ( $project->{'description'...})
+    }
 
     # -g
     if ( $project->{'git'} ) {
       $args{g} = $project->{'git'};
-    } ## end if ( $project->{'git'})
-  } ## end if ($project)
+    }
+  }
 
   return %args;
-} ## end sub parse_project
+}
 
 ########################################################################
 sub parse_pm_module {
@@ -600,9 +661,9 @@ sub parse_pm_module {
 
   if ($pm_module) {
     $args{m} = $pm_module;
-  } ## end if ($pm_module)
+  }
   return %args;
-} ## end sub parse_pm_module
+}
 
 ########################################################################
 sub get_buildspec {
@@ -618,7 +679,7 @@ sub get_buildspec {
     if $EVAL_ERROR || !$buildspec;
 
   return $buildspec;
-} ## end sub get_buildspec
+}
 
 ########################################################################
 sub parse_buildspec {
@@ -644,8 +705,12 @@ sub parse_buildspec {
 
   %args = parse_path( $buildspec->{path}, %args );
 
-  %args = write_extra_files( $buildspec->{'extra-files'},
-    $buildspec->{'extra'}, %args );
+  %args = write_extra_files(
+    extra_files  => $buildspec->{'extra-files'},
+    extra        => $buildspec->{'extra'},
+    args         => \%args,
+    project_root => $options{'project-root'}
+  );
 
   %args = write_provides( $buildspec->{'provides'}, %args );
 
@@ -662,12 +727,12 @@ sub parse_buildspec {
     if ( $value =~ /^\!(.*)$/xsm ) {
       if ( $options{$1} ) {
         delete $options{$1};
-      } ## end if ( $options{$1} )
-    } ## end if ( $value =~ /^\!(.*)$/xsm)
+      }
+    }
     elsif ( $options{$key} ) {
       $args{$value} = $EMPTY;
-    } ## end elsif ( $options{$key} )
-  } ## end foreach my $pair ( pairs @boolean_args)
+    }
+  }
 
   # set value args from buildspec
   foreach my $pair ( pairs qw{ destdir o extra f } ) {
@@ -675,16 +740,16 @@ sub parse_buildspec {
 
     if ( $buildspec->{$key} ) {
       $args{$value} = $buildspec->{$key};
-    } ## end if ( $buildspec->{$key...})
-  } ## end foreach my $pair ( pairs qw{ destdir o extra f })
+    }
+  }
 
   foreach my $k ( keys %args ) {
     $args{ $DASH . $k } = $args{$k};
     delete $args{$k};
-  } ## end foreach my $k ( keys %args )
+  }
 
   return %args;
-} ## end sub parse_buildspec
+}
 
 ########################################################################
 sub get_requires {
@@ -701,7 +766,7 @@ sub get_requires {
       my ( $fh, $all_lines, $args, $line ) = @_;
       $line = filter( $fh, $all_lines, $args, $line );
 
-      return ()    if $line =~ /^perl\s+/xsm;
+      return ()    if $line && $line =~ /^perl\s+/xsm;
       return $line if !defined $line;
       return $line if $core_modules;
       return $line if $line =~ /^[+]/xsm;
@@ -725,7 +790,7 @@ sub get_requires {
   );
 
   return \%modules;
-} ## end sub get_requires
+}
 
 ########################################################################
 sub get_modules {
@@ -735,7 +800,7 @@ sub get_modules {
   my ($modules) = process_file( $module_list, chomp => $TRUE );
 
   return $modules;
-} ## end sub get_modules
+}
 
 ########################################################################
 sub get_yaml_specfile {
@@ -757,7 +822,7 @@ sub get_yaml_specfile {
   );
 
   return Load join "\n", @{$lines};
-} ## end sub get_yaml_specfile
+}
 
 ########################################################################
 sub validate_object {
@@ -771,7 +836,7 @@ sub validate_object {
       if ( !exists $spec->{$k} ) {
         carp "ERROR: not a valid key ($k)\n" . Dumper [ $k, $spec ];
         $err++;
-      } ## end if ( !exists $spec->{$k...})
+      }
 
       if ( ref $spec->{$k} ) {
         if ( !ref $obj->{$k}
@@ -779,19 +844,19 @@ sub validate_object {
           warn "ERROR: wrong type for ($k) - $k must be "
             . reftype( $spec->{$k} ) . "\n";
           $err++;
-        } ## end if ( !ref $obj->{$k} ||...)
+        }
         else {
           validate_object( $obj->{$k}, $spec->{$k}, $err );
-        } ## end else [ if ( !ref $obj->{$k} ||...)]
-      } ## end if ( ref $spec->{$k} )
-    } ## end foreach my $k ( keys %{$obj...})
-  } ## end if ( reftype($obj) eq ...)
+        }
+      }
+    }
+  }
   else { # just validate arrays are arrays for now, deep dive TBD
     $err = reftype($spec) eq 'ARRAY';
-  } ## end else [ if ( reftype($obj) eq ...)]
+  }
 
   return $err ? $FALSE : $TRUE;
-} ## end sub validate_object
+}
 
 # +-------------------------+
 # | MAIN SCRIPT STARTS HERE |
@@ -807,47 +872,49 @@ sub main {
     'core-modules!',        'dryrun',
     'debug|D',              'exe-files=s',
     'help|h',               'log-level|l=s',
-    'module|m=s',           'require-versions!',
+    'module|m=s',           'require-versions|R!',
     'min-perl-version|M=s', 'requires|r=s',
-    'scandeps|s',           'test-requires=s',
-    'verbose|V',            'version|v',
-    'work-dir|w=s',
+    'project-root|p=s',     'scandeps|s',
+    'test-requires=s',      'verbose|V',
+    'version|v',            'work-dir|w=s',
   );
 
   if ( $options{help} ) {
     help;
-  } ## end if ( $options{help} )
+  }
+
+  $options{'project-root'} //= getcwd;
 
   $options{'yaml-spec'} = get_yaml_specfile;
 
   if ( $options{'min-perl-version'} ) {
     $options{'min-perl-version'}
       = version->parse( $options{'min-perl-version'} )->stringify;
-  } ## end if ( $options{'min-perl-version'...})
+  }
   else {
     if ( $options{requires} ) {
       $options{'min-perl-version'} = get_perl_version( $options{requires} );
     }
 
     # $options{'min-perl-version'} //= $DEFAULT_PERL_VERSION;
-  } ## end else [ if ( $options{'min-perl-version'...})]
+  }
 
   if ( !exists $options{'require-versions'} ) {
     $options{'require-versions'} = $TRUE;
-  } ## end if ( !exists $options{...})
+  }
 
   if ( $options{'version'} ) {
     print $PROGRAM_NAME . ' v' . $VERSION . $NL;
 
     exit $SH_SUCCESS;
-  } ## end if ( $options{'version'...})
+  }
 
   my $log_level = $options{'log-level'};
 
   if ($log_level) {
     if ( $log_level =~ /\A[1-5]\z$/xsm ) {
       $log_level = ( $ERROR, $WARN, $INFO, $DEBUG, $TRACE )[ $log_level - 1 ];
-    } ## end if ( $log_level =~ /\A[1-5]\z$/xsm)
+    }
     else {
       $log_level = {
         ERROR => $ERROR,
@@ -856,14 +923,18 @@ sub main {
         DEBUG => $DEBUG,
         TRACE => $TRACE,
       }->{ uc $options{'log-level'} };
-    } ## end else [ if ( $log_level =~ /\A[1-5]\z$/xsm)]
+    }
 
-    if ( !$log_level ) {
-      $log_level = $ERROR;
-    } ## end if ( !$log_level )
+  }
+  elsif ( $options{debug} ) {
+    $log_level = $DEBUG;
+  }
 
-    Log::Log4perl->easy_init($log_level);
-  } ## end if ($log_level)
+  if ( !$log_level ) {
+    $log_level = $ERROR;
+  }
+
+  Log::Log4perl->easy_init($log_level);
 
   if ( $options{buildspec} ) {
     my %args = parse_buildspec(%options);
@@ -876,15 +947,15 @@ sub main {
         $DEBUG => 4,
         $TRACE => 5,
       }->{$log_level};
-    } ## end if ($log_level)
+    }
 
     if ( !$options{'dryrun'} ) {
       exec '@bindir@/make-cpan-dist ' . join $SPACE, %args; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
-    } ## end if ( !$options{'dryrun'...})
+    }
     else {
       print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
-    } ## end else [ if ( !$options{'dryrun'...})]
-  } ## end if ( $options{buildspec...})
+    }
+  }
   else {
     croak 'no module specified'
       if !$options{'module'};
@@ -899,11 +970,11 @@ sub main {
     if ( !write_makefile(%options) ) {
       help();
       exit $SH_FAILURE;
-    } ## end if ( !write_makefile(%options...))
-  } ## end else [ if ( $options{buildspec...})]
+    }
+  }
 
   exit $SH_SUCCESS;
-} ## end sub main
+}
 
 1;
 
@@ -930,6 +1001,7 @@ path:
   pm_module: "type:string"
   tests: "type:string"
   exe_files: "type:string"
+  scripts: "type:string"
 destdir: "type:string"
 extra: "type:string"
 extra-files:

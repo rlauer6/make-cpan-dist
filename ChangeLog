@@ -1,3 +1,20 @@
+Fri Sep  2 11:01:41 2022  Rob Lauer  <rlauer@usgn.net>
+
+	[1.5.20 - scriptsdir]:
+	* src/main/perl/lib/make-cpan-dist.pl.in
+	- -p, --project-root
+	(_is_obj):new
+	(is_array): new
+	(is_scalar): new
+	(is_hash): new
+	(parse_buildspec)
+	- args
+	- project_root
+	(get_requires): if $$line &&
+	* src/main/bash/bin/make-cpan-dist.in
+	- -S script files
+	(find_git_home): assume cwd is project_home
+
 Tue Aug  2 07:50:29 2022  Rob Lauer  <rlauer@usgn.net>
 
 	[1.5.19 - versions]:
