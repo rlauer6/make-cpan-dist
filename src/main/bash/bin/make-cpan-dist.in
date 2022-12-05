@@ -27,6 +27,7 @@ Options
 -l path         - path to Perl modules
 -L log level    - logging level 1=error, 5=trace
 -m name         - module name
+-M perl version - minimum perl version
 -o dir          - output directory (default: current directory)
 -p              - preserve Makefile.PL
 -P file         - file that contains a list of modules to be packaged
@@ -225,7 +226,7 @@ function scan() {
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:" arg "$@"; do
+while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:" arg "$@"; do
 
     case "${arg}" in
 
@@ -287,6 +288,9 @@ while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:" arg "$@"; do
 
         m)
             MODULE="$OPTARG";
+            ;;
+
+        M)  MIN_PERL_VERSION="$OPTARG";
             ;;
 
         o)
@@ -541,7 +545,11 @@ cat ${workdir}/provides.tmp | perl -npe 's/\//::/g; s/\.pm$//;' | sort -u > ${wo
 # should we resolve versions here or in Perl module?
 # echo "$(get_module_versions ${workdir}/provides)" > ${workdir}/provides
 
-has_perl_version=$(cat ${workdir}/requires.tmp | grep '^perl' | awk '{print $2}')
+if test -n "$MIN_PERL_VERSION"; then
+    has_perl_version="$MIN_PERL_VERSION"
+else
+    has_perl_version=$(cat ${workdir}/requires.tmp | grep '^perl' | awk '{print $2}')
+fi
 
 depfile=$(mktemp)
 awk '{print $1 " " $2}' ${workdir}/requires.tmp | sort -u | grep -v '^perl' > $depfile
@@ -611,7 +619,7 @@ test -n "$DEBUG" && EXTRA_OPTIONS="--debug"
 # create the Makefile.PL
 if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             $CORE_MODULES $BUILD_REQUIRES -r ${workdir}/requires \
-            -e $exe_files $TESTREQUIRES \
+            -e $exe_files $TESTREQUIRES  $min_perl_version \
             -w ${builddir} $EXTRA_OPTIONS \
             -l $LOG_LEVEL \
             -m "$MODULE" \

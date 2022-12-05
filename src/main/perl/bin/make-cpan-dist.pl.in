@@ -364,7 +364,7 @@ sub write_makefile {
 
   my $min_perl_version_str
     = defined $min_perl_version
-    ? 'MIN_PERL_VERSION => $min_perl_version,'
+    ? qq{MIN_PERL_VERSION => '$min_perl_version',}
     : $EMPTY;
 
   my $MAKEFILE = <<"END_OF_TEXT";
@@ -487,10 +487,10 @@ sub write_extra_files {
   foreach my $e ( @{$extra_files} ) {
     DEBUG Dumper( [$e] );
 
-    if ( !ref $e ) { # simple file
+    if ( !ref $e ) {  # simple file
       push @file_list, $e;
     }
-    elsif ( is_hash($e) ) { # possibly dest => dir, or dest => list
+    elsif ( is_hash($e) ) {  # possibly dest => dir, or dest => list
       foreach my $destdir ( keys %{$e} ) {
         my ($destdir) = keys %{$e};
 
@@ -573,7 +573,7 @@ sub parse_dependencies {
 
   if ($dependencies) {
 
-    if ( $dependencies->{'path'} ) { # deprecatd
+    if ( $dependencies->{'path'} ) {  # deprecatd
       $args{D} = $dependencies->{'path'};
       warn "path is deprecated: use requires\n";
     }
@@ -695,6 +695,10 @@ sub parse_buildspec {
 
   my %args;
 
+  if ( $buildspec->{'min-perl-version'} ) {
+    $args{M} = $buildspec->{'min-perl-version'};
+  }
+
   %args = parse_project( $buildspec->{project}, %args );
 
   %args = parse_pm_module( $buildspec->{'pm_module'}, %args );
@@ -815,7 +819,7 @@ sub get_yaml_specfile {
 
       my $line = <$fh>;
 
-      return if $line =~ /^\=pod/xsm; # signal end of file
+      return if $line =~ /^\=pod/xsm;  # signal end of file
 
       return $line;
     }
@@ -851,7 +855,7 @@ sub validate_object {
       }
     }
   }
-  else { # just validate arrays are arrays for now, deep dive TBD
+  else {  # just validate arrays are arrays for now, deep dive TBD
     $err = reftype($spec) eq 'ARRAY';
   }
 
@@ -881,6 +885,7 @@ sub main {
 
   if ( $options{help} ) {
     help;
+    exit;
   }
 
   $options{'project-root'} //= getcwd;
@@ -950,10 +955,10 @@ sub main {
     }
 
     if ( !$options{'dryrun'} ) {
-      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
     }
     else {
-      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
     }
   }
   else {
@@ -981,6 +986,7 @@ sub main {
 __DATA__
 ---
 version: "@PACKAGE_VERSION@"
+min-perl-version: "type:string"
 project:
   git: "type:string"
   description: "type:string"

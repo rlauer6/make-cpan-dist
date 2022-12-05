@@ -1,3 +1,13 @@
+Mon Dec  5 11:36:16 2022  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.21]:
+
+	[min-perl-version]:
+	* src/main/bash/bin/make-cpan-dist.in
+	- add support for -M (min-perl-version)
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- add support for --min-perl-version
+
 Fri Sep  2 11:01:41 2022  Rob Lauer  <rlauer@usgn.net>
 
 	[1.5.20 - scriptsdir]:
