@@ -1,3 +1,16 @@
+Sun Jan  8 08:42:43 2023  Rob Lauer  <rlauer@usgn.net>
+
+	[1.5.22]:
+	* README.md.in: minor changes
+	* VERSION: bump
+	* configure.ac: add required/optional Perl modules
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- --pager option
+	- pod tweaks
+	(help): use pager if available
+	(write_file_list):
+	- remove project root from file list when directory specified in extra-files
+
 Mon Dec  5 11:36:16 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.21]:

@@ -7,25 +7,25 @@ package CPAN::Maker;
 use strict;
 use warnings;
 
-use CPAN::Maker::Constants qw{ :all };
-use CPAN::Maker::Utils qw{ :all };
+use CPAN::Maker::Constants qw( :all );
+use CPAN::Maker::Utils qw( :all );
 
 use Carp;
 use Cwd;
 use Data::Dumper;
-use English qw{ -no_match_vars };
+use English qw( -no_match_vars );
 use ExtUtils::MM;
 use File::Basename;
 use File::Find;
-use File::Process qw{ process_file filter };
-use File::Temp qw{ :POSIX };
-use Getopt::Long qw{:config no_ignore_case };
-use JSON::PP qw{ encode_json decode_json };
-use List::Util qw{ pairs };
-use Log::Log4perl qw{ :easy };
+use File::Process qw( process_file filter );
+use File::Temp qw( :POSIX );
+use Getopt::Long qw(:config no_ignore_case );
+use JSON::PP qw( encode_json decode_json );
+use List::Util qw( pairs );
+use Log::Log4perl qw( :easy );
 use Log::Log4perl::Level;
 use Pod::Usage;
-use Scalar::Util qw{ reftype };
+use Scalar::Util qw( reftype );
 use YAML::Tiny;
 use version;
 
@@ -36,6 +36,18 @@ caller or __PACKAGE__->main();
 ########################################################################
 sub help {
 ########################################################################
+  my ($options) = @_;
+
+  my $token;
+
+  if ( $options->{pager} ) {
+    $token = eval {
+      require IO::Pager;
+
+      IO::Pager::open( *STDOUT, '|-:utf8', 'Unbuffered' );
+    };
+  }
+
   print <<"END_OF_TEXT";
 usage: $PROGRAM_NAME OPTIONS
 
@@ -54,6 +66,7 @@ OPTIONS
 -m, --module              module name
 -M, --module-list         list of modules to include in distribution
 -p, --project-root        default: current working directory
+-P, --pager, --nopager    use a pager for help, default: use pager
 -r, --requires            dependency list
 -R, --require-versions    add version numbers to dependencies
     --no-require-versions
@@ -188,7 +201,7 @@ sub get_provides {
         my $module_version = get_module_version( $module, $include_path );
 
         my ( $provided_module, $version )
-          = @{$module_version}{qw{ module version}};
+          = @{$module_version}{qw( module version)};
 
         croak "$module not found in $include_path"
           if !defined $version;
@@ -290,7 +303,7 @@ sub write_makefile {
   local $Data::Dumper::Pad      = $SPACE x $INDENT;
 
   # dependencies
-  foreach my $d (qw{requires test-requires build-requires }) {
+  foreach my $d (qw(requires test-requires build-requires )) {
     $options{$d} = $options{$d} || $d;
   }
 
@@ -320,7 +333,7 @@ sub write_makefile {
     $build_req = trim($build_req);
   }
 
-  foreach my $m (qw{ ExtUtils::MakeMaker File::ShareDir::Install}) {
+  foreach my $m (qw( ExtUtils::MakeMaker File::ShareDir::Install)) {
     $build_req->{$m} = $build_req->{$m} || $FALSE;
   }
 
@@ -421,7 +434,7 @@ sub write_file_list {
   my (%args) = @_;
 
   my ( $file_list, $destdir, $project_root )
-    = @args{qw{file_list destination project_root}};
+    = @args{qw(file_list destination project_root)};
 
   my @expanded_list;
 
@@ -439,15 +452,22 @@ sub write_file_list {
         },
         $fqp
       );
+      # remove project root since bash script will add it
+      for (@expanded_list) {
+        s/^$project_root//xsm;
+      }
     }
     else {
       # the intent is to cp files to root of distribution (not
       # to install the files during package installation...the
       # exception being if items are installed into share
       # directory
-      my ( $name, $path, $ext ) = fileparse( $fqp, qr/[.][^.]*/xsm );
-      push @expanded_list, sprintf "%s %s%s%s%s\n", $fqp, $destdir, $name,
-        $ext;
+      die
+        "ERROR: missing file in list ($fqp) - check your `extra-files` section\n"
+        if !-e $fqp;
+
+      my ( $name, $path, $ext ) = fileparse( $fqp, qr/[.][^.]+/xsm );
+      push @expanded_list, sprintf '%s %s%s%s', $f, $destdir, $name, $ext;
     }
   }
 
@@ -471,7 +491,7 @@ sub write_extra_files {
   DEBUG('writing extra-files');
 
   my ( $extra_files, $extra, $project_root )
-    = @params{qw{extra_files extra project_root}};
+    = @params{qw(extra_files extra project_root)};
 
   my %args = %{ $params{args} };
 
@@ -487,19 +507,19 @@ sub write_extra_files {
   foreach my $e ( @{$extra_files} ) {
     DEBUG Dumper( [$e] );
 
-    if ( !ref $e ) {  # simple file
+    if ( !ref $e ) { # simple file
       push @file_list, $e;
     }
-    elsif ( is_hash($e) ) {  # possibly dest => dir, or dest => list
+    elsif ( is_hash($e) ) { # possibly dest => dir, or dest => list
       foreach my $destdir ( keys %{$e} ) {
         my ($destdir) = keys %{$e};
 
         my $file_list = $e->{$destdir};
 
-        if ( is_scalar $file_list ) {
+        if ( is_scalar($file_list) ) {
           $file_list = [$file_list];
         }
-        elsif ( !is_array ) {
+        elsif ( !is_array($file_list) ) {
           croak 'extra-files args can only be scalar or list';
         }
 
@@ -573,7 +593,7 @@ sub parse_dependencies {
 
   if ($dependencies) {
 
-    if ( $dependencies->{'path'} ) {  # deprecatd
+    if ( $dependencies->{'path'} ) { # deprecatd
       $args{D} = $dependencies->{'path'};
       warn "path is deprecated: use requires\n";
     }
@@ -723,7 +743,7 @@ sub parse_buildspec {
   # set boolean args from options
 
   my @boolean_args
-    = qw{ verbose v cleanup !x scandeps s require-versions !A };
+    = qw( verbose v cleanup !x scandeps s require-versions !A );
 
   foreach my $pair ( pairs @boolean_args ) {
     my ( $key, $value ) = @{$pair};
@@ -739,7 +759,7 @@ sub parse_buildspec {
   }
 
   # set value args from buildspec
-  foreach my $pair ( pairs qw{ destdir o extra f } ) {
+  foreach my $pair ( pairs qw( destdir o extra f ) ) {
     my ( $key, $value ) = @{$pair};
 
     if ( $buildspec->{$key} ) {
@@ -819,7 +839,7 @@ sub get_yaml_specfile {
 
       my $line = <$fh>;
 
-      return if $line =~ /^\=pod/xsm;  # signal end of file
+      return if $line =~ /^\=pod/xsm; # signal end of file
 
       return $line;
     }
@@ -855,7 +875,7 @@ sub validate_object {
       }
     }
   }
-  else {  # just validate arrays are arrays for now, deep dive TBD
+  else { # just validate arrays are arrays for now, deep dive TBD
     $err = reftype($spec) eq 'ARRAY';
   }
 
@@ -867,7 +887,7 @@ sub validate_object {
 # +-------------------------+
 
 sub main {
-  my %options = ( cleanup => 1 );
+  my %options = ( cleanup => 1, pager => 1 );
 
   GetOptions(
     \%options,              'abstract|A=s',
@@ -878,13 +898,15 @@ sub main {
     'help|h',               'log-level|l=s',
     'module|m=s',           'require-versions|R!',
     'min-perl-version|M=s', 'requires|r=s',
-    'project-root|p=s',     'scandeps|s',
-    'test-requires=s',      'verbose|V',
-    'version|v',            'work-dir|w=s',
+    'pager|P!',             'project-root|p=s',
+    'scandeps|s',           'test-requires=s',
+    'verbose|V',            'version|v',
+    'work-dir|w=s',
   );
 
   if ( $options{help} ) {
-    help;
+    help( \%options );
+
     exit;
   }
 
@@ -955,10 +977,10 @@ sub main {
     }
 
     if ( !$options{'dryrun'} ) {
-      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
     }
     else {
-      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
     }
   }
   else {
@@ -1039,20 +1061,22 @@ make-cpan-spec.pl
 
 =head1 DESCRIPTION
 
-Utility that is part of the toolchain to create a simple CPAN
+Utility that is part of a toolchain to create a simple CPAN
 distribution. This utility is typically called from the C<bash> helper
 script of the same name or can be passed a build specfication file in
 YAML format. You may I<not> find this easier to use than crafting your
 own CPAN distributions with the various tools available for
 such.
 
-The helper script (F<make-cpan-dist>) does most of the heavy lifting,
+The helper C<bash> script (F<make-cpan-dist>) does most of the heavy lifting,
 doing things for you like attempting to resolve dependencies and
 packaging the distribution as a tarball.
 
 In general you should consider using the C<bash> script or create a
 F<buildspec.yml> file and invoke this utility with the C<-b> option
 described below rather than calling this script directly.
+
+Try C<make-cpan-dist.pl -h> to get some helpful instructions.
 
 =head2 Using the Bash Script
 
@@ -1336,15 +1360,21 @@ Example:
    - ChangeLog
    - README
    -
-     examples: ../src/examples
+     examples: src/examples
 
-If you include in your extra-files specification, a 'share' directory,
-then that directory will be installed as part of the
-distribution.
+ extra-files:
+   - ChangeLog
+   - README
+   - examples:
+      - src/examples/foo.pl
+      - src/examples/boo.pl
 
-I<This feature is only avaiable when the directory is specified in the
+If you include in your C<extra-files> specification, a 'share' directory,
+then that directory will be installed as part of the distribution.
+
+I<This feature is only available when the directory is specified in the
 C<extra-files> key of the F<buildspec.yml> file. Files specified in
-the C<extra> section will be copied to the root of the distribution
+the C<extra-files> section will be copied to the root of the distribution
 tarball and will not be automatically installed.>
 
 =item exe_files (optional)

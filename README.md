@@ -13,10 +13,11 @@ Lambdas, I've recently needed a quick and easy CPAN distribution
 creation utility.  Hence this project.
 
 After installing the project you'll find more information by reading
-the man page.
+the man page or by requesting usage information.
 
 ```
 man make-cpan-dist
+make-cpan-dist.pl -h
 ```
 
 # The Goal
@@ -71,7 +72,9 @@ mention I'm using this as part of a CI/CD pipeline?
 Make sure you have the `autotools` toolchain installed. If you are
 using a RedHat derived Linux distribution, install the `autoconf`
 package using `yum`. If you are using a Debian based system then you
-may have success using `apt` to install the necessary dependencies.
+may have success using `apt` to install the necessary
+dependencies. There are also some Perl module dependencies that are
+checked when you run `./configure`.
 
 ```
 yum install -y autoconf
@@ -147,13 +150,18 @@ post I think I should write some day. Oh wait I did...
 If you are running on a Debian based system you can grab
 `/usr/lib/rpm/perl.req` from the `rpm` package apparently.
 
-If you don't have access to that utility, but have another favorite
-Perl module dependency resolver (don't we all?) then you can use that
-by providing it on the command line (-r) of the bash helper script
+I've recently hacked a bit at the `perl.req` to create
+`Module::ScanDeps::Static` that cleans up and fixes a few nits in
+`perl.req`. You can find that module here
+[Module::ScanDeps::Static](https://metacpan.org/pod/Module::ScanDeps::Static)
+
+If you don't have access to those utilities but have another favorite
+Perl module dependency resolver (don't we all?) then you're free to use that
+by providing it on the command line (-r) of the `bash` helper script
 (`make-cpan-dist`). The function you specify should simply provide a
 list of Perl modules one per line and output that to STDOUT.
 
-You can also use `scandeps.pl` by specifying the -s option to the
+You can also use `scandeps.pl` by specifying the `-s` option to the
 helper script.
 
 ```
@@ -222,7 +230,7 @@ path:
 
 You specify some project metadata and possibly a pointer to the
 project in a git repository that can be cloned.  You must provide the
-`pm_module`, `author`, `pm_module` and `path` attributes.
+`pm_module`, `author`,  and `path` attributes.
 
 The `path` attributes specify the path to the module and the path to
 the tests which will be packaged. All files with an extension of `.t`
@@ -235,7 +243,7 @@ to the root of the project or your current working directory if you
 are not specifying a git repository as the source of your
 package.
 
-If your project includes perl scripts, you can add those to your
+If your project includes Perl scripts, you can add those to your
 distribution by setting the path to those with the `exe_files`
 subsection of `path`.  These will be packaged and installed in the
 `bin` directory (INSTALLBIN).
@@ -248,7 +256,7 @@ So, assuming you have created an appropriate
 ```
 
 After executing that statement, you should have a tar ball in your
-current working directory. WooHoo!
+current working directory.
 
 #### Advanced Options
 
@@ -278,24 +286,25 @@ control what and how things get packaged.
     resolver: scandeps
   ```
 
-* to manually specify a list of dependencies, set the `path` option
+* to manually specify a list of dependencies, set the `requires` option
   under the `dependencies` section to the path to a file that contains
   a list of Perl modules. If the name of the file is `cpanfile` then
   it is assumed to be a `cpanfile` formatted list, otherwise the list
   should be a simple listing of module names optionally followed by a
   version (e.g. `List::Util 1.5`). By default core modules will be
-  filtered from the list of modules.  Include the option
-  `core_modules` with a value of 'yes' if you do not want to filter
-  out core modules. If you want to filter core modules but need to
-  include a core module with a specific version, place a + in front of
-  the module name (e.g. +List::Util 1.5). Some modules may be core,
-  but you need to use a newer version of the core module. This happens
-  when, for example you require features (or fixes) of a core module
-  that only appear in a newer version of perl.
+  filtered from the list of modules.
+  
+  Include the option `core_modules` with a value of _yes_ if you do
+  not want to filter out core modules. If you want to filter core
+  modules but need to include a core module with a specific version,
+  place a + in front of the module name (e.g. +List::Util 1.5). Some
+  modules may be core, but you need to use a newer version of the core
+  module. This happens when, for example you require features (or
+  fixes) of a core module that only appear in a newer version of Perl.
   
   ```
   dependencies:
-    path: requires
+    requires: requires
     core_modules: yes
   ```
 
@@ -342,13 +351,13 @@ Assume my source tree looks something like this:
 
 ```
 .
-├── lib
-│   └── Foo
-│       └── Bar.pm
-└── t
+lib/
+lib/Foo
+lib/Foo/Bar.pm
+t/
 ```
 
-...then go ahead and give this a try:
+...then give this a try:
 
 ```
 /usr/local/bin/make-cpan-dist -m Amazon::Credentials \
@@ -360,7 +369,7 @@ Assume my source tree looks something like this:
 
 So far, neither of these methods is particularly hard and can be used
 interchangeably as part of you deployment pipeline.  The key to the
-"easiness" part, at least for me, is the fact that the bash script
+"easiness" part, at least for me, is the fact that the `bash` script
 will try to resolve dependencies using the helper from the `rpm-build`
 project (`/usr/lib/rpm/perl.req` or the dependency checker you
 specify) and find the Perl module version for each of those
@@ -395,12 +404,12 @@ should be) and creating `make` files (what? nobody uses `make`
 anymore?) then put your dependency files under source control and make
 them dependencies for your `make` rules.  ;-)
 
-So, just to be transparent, the bash helper script does the following,
+So, just to be transparent, the `bash` helper script does the following,
 all of which you can of course do manually to create your dependency
 list.
 
-1. iterate over all of the .pm files in your source tree
-   1. run `/usr/lib/rpm/perl.req` and save the output
+1. iterate over all of the `.pm` files in your source tree
+   1. run a dependency checker and save the output
 1. sort the list and get the unique dependencies
 1. iterate over the sorted list
    1. get the version number of each module
@@ -418,7 +427,7 @@ of the files are then used to populate the template for the
 
 I hope you find this useful. If I can make it more useful, let me
 know. Oh, if you find yourself scratching your head and wondering if
-indeed the bash script calls the perl script and vice versa, you are
+indeed the `bash` script calls the Perl script and vice versa, you are
 correct.
 
 # Author
