@@ -1,3 +1,13 @@
+Sun Jan  8 11:07:57 2023  Rob Lauer  <rlauer@usgn.net>
+
+	[1.5.23]:
+	* VERSION: bump
+	* configure.ac: output versiom
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(write_extra_files)
+	- don't overwrite extra-files
+	- set exta-files entry to empty list if undef
+
 Sun Jan  8 08:42:43 2023  Rob Lauer  <rlauer@usgn.net>
 
 	[1.5.22]:
