@@ -1,3 +1,19 @@
+Wed Jan 11 08:56:41 2023  Rob Lauer  <rlauer@usgn.net>
+
+	[1.5.24]:
+
+	[project-root]:
+	* VERSION: bump
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(parse_buildspec)
+	- set -H if project-root in options
+	(parse_dependecies)
+	- set default for core_modules to 'no'
+	* src/main/bash/bin/make-cpan-dist.in
+	- -H project-root
+	- test for git if -g option
+	- set default for from git config if missing
+
 Sun Jan  8 11:07:57 2023  Rob Lauer  <rlauer@usgn.net>
 
 	[1.5.23]:

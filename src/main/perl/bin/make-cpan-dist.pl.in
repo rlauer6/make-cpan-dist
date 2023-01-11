@@ -29,7 +29,7 @@ use Scalar::Util qw( reftype );
 use YAML::Tiny;
 use version;
 
-our $VERSION = '@PACKAGE_VERSION@'; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+our $VERSION = '@PACKAGE_VERSION@'; ## no critic (RequireInterpolationOfMetachars)
 
 caller or __PACKAGE__->main();
 
@@ -596,34 +596,38 @@ sub parse_dependencies {
   my ( $dependencies, %args ) = @_;
 
   if ($dependencies) {
+    croak 'malformed buildspec.yml file - dependencies section with no keys?'
+      if !keys %{$dependencies};
 
-    if ( $dependencies->{'path'} ) { # deprecatd
-      $args{D} = $dependencies->{'path'};
+    $dependencies->{core_modules} //= 'no';
+
+    if ( $dependencies->{path} ) { # deprecatd
+      $args{D} = $dependencies->{path};
       warn "path is deprecated: use requires\n";
     }
 
-    if ( $dependencies->{'requires'} ) {
-      $args{D} = $dependencies->{'requires'};
+    if ( $dependencies->{requires} ) {
+      $args{D} = $dependencies->{requires};
     }
 
-    if ( $dependencies->{'test_requires'} ) {
-      $args{T} = $dependencies->{'test_requires'};
+    if ( $dependencies->{test_requires} ) {
+      $args{T} = $dependencies->{test_requires};
     }
 
-    if ( $dependencies->{'build_requires'} ) {
-      $args{B} = $dependencies->{'build_requires'};
+    if ( $dependencies->{build_requires} ) {
+      $args{B} = $dependencies->{build_requires};
     }
 
-    if ( $dependencies->{'core_modules'} eq 'yes' ) {
+    if ( $dependencies->{core_modules} eq 'yes' ) {
       $args{c} = $EMPTY;
     }
 
-    if ( my $resolver = $dependencies->{'resolver'} ) {
+    if ( my $resolver = $dependencies->{resolver} ) {
       if ( $resolver eq 'scandeps' ) {
         $args{s} = $EMPTY;
       }
       else {
-        $args{r} = $dependencies->{'resolver'};
+        $args{r} = $dependencies->{resolver};
       }
     }
 
@@ -654,24 +658,24 @@ sub parse_project {
   my ( $project, %args ) = @_;
 
   if ($project) {
-    if ( $project->{'author'} ) {
-      $args{a} = $project->{'author'}->{'name'};
+    if ( $project->{author} ) {
+      $args{a} = $project->{author}->{name};
 
-      if ( $project->{'author'}->{'mailto'} ) {
-        $args{a} .= ' <' . $project->{'author'}->{'mailto'} . '>';
+      if ( $project->{author}->{mailto} ) {
+        $args{a} .= ' <' . $project->{author}->{mailto} . '>';
       }
 
       $args{a} = sprintf q{'%s'}, $args{a};
     }
 
     # -d
-    if ( $project->{'description'} ) {
-      $args{d} = sprintf q{'%s'}, $project->{'description'};
+    if ( $project->{description} ) {
+      $args{d} = sprintf q{'%s'}, $project->{description};
     }
 
     # -g
-    if ( $project->{'git'} ) {
-      $args{g} = $project->{'git'};
+    if ( $project->{git} ) {
+      $args{g} = $project->{git};
     }
   }
 
@@ -723,26 +727,30 @@ sub parse_buildspec {
     $args{M} = $buildspec->{'min-perl-version'};
   }
 
+  if ( $options{'project-root'} ) {
+    $args{H} = $options{'project-root'};
+  }
+
   %args = parse_project( $buildspec->{project}, %args );
 
-  %args = parse_pm_module( $buildspec->{'pm_module'}, %args );
+  %args = parse_pm_module( $buildspec->{pm_module}, %args );
 
   %args = parse_include_version( $buildspec->{'include-version'}, %args );
 
-  %args = parse_dependencies( $buildspec->{'dependencies'}, %args );
+  %args = parse_dependencies( $buildspec->{dependencies}, %args );
 
   %args = parse_path( $buildspec->{path}, %args );
 
   %args = write_extra_files(
     extra_files  => $buildspec->{'extra-files'},
-    extra        => $buildspec->{'extra'},
+    extra        => $buildspec->{extra},
     args         => \%args,
     project_root => $options{'project-root'}
   );
 
-  %args = write_provides( $buildspec->{'provides'}, %args );
+  %args = write_provides( $buildspec->{provides}, %args );
 
-  %args = write_resources( $buildspec->{'resources'}, %args );
+  %args = write_resources( $buildspec->{resources}, %args );
 
   # set boolean args from options
 
@@ -934,7 +942,7 @@ sub main {
     $options{'require-versions'} = $TRUE;
   }
 
-  if ( $options{'version'} ) {
+  if ( $options{version} ) {
     print $PROGRAM_NAME . ' v' . $VERSION . $NL;
 
     exit $SH_SUCCESS;
@@ -980,7 +988,7 @@ sub main {
       }->{$log_level};
     }
 
-    if ( !$options{'dryrun'} ) {
+    if ( !$options{dryrun} ) {
       exec '@bindir@/make-cpan-dist ' . join $SPACE, %args; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
     }
     else {
@@ -989,14 +997,13 @@ sub main {
   }
   else {
     croak 'no module specified'
-      if !$options{'module'};
+      if !$options{module};
 
     croak 'no dependencies'
-      if !$options{'requires'};
+      if !$options{requires};
 
-    $options{'author'} = $options{'author'}
-      // 'Anonyous <anonymous@example.com>';
-    $options{'abstract'} = $options{'abstract'} // 'my awesome Perl module!';
+    $options{author} = $options{author} // 'Anonyous <anonymous@example.com>';
+    $options{abstract} = $options{abstract} // 'my awesome Perl module!';
 
     if ( !write_makefile(%options) ) {
       help();

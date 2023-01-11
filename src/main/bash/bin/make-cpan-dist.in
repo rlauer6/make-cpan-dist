@@ -7,7 +7,7 @@ function usage {
     test -n "$1" && echo "error: $1";
     
     cat <<EOT
-usage: make-cpan-dist Options
+usage: make-cpan-dist options
 
 Utility to create a CPAN distribution. See 'man make-cpan-dist'
 
@@ -23,6 +23,7 @@ Options
 -T file         - use file as the test dependency list
 -e path         - path for extra .pl files to package
 -h              - help
+-H project home - project home, defaults to '..'
 -f file         - file containing a list of extra files to include
 -l path         - path to Perl modules
 -L log level    - logging level 1=error, 5=trace
@@ -226,7 +227,14 @@ function scan() {
 # | SCRIPT STARTS HERE |
 # +--------------------+
 
-while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:" arg "$@"; do
+# optional
+GIT=$(command -v git);
+PERLTIDY=$(command -v perltidy);
+
+# required
+PERL=$(command -v perl);
+
+while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:" arg "$@"; do
 
     case "${arg}" in
 
@@ -271,13 +279,20 @@ while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:" arg "$@"; do
 
         g)
             git_project="$OPTARG";
-            ;;
 
+            if test -z "$GIT"; then
+                FATAL_ERROR "you must have 'git' installed to use this option"
+            fi
+            ;;
 
         h)
 	    usage;
 	    ;;
 
+        H)
+            PROJECT_HOME="$OPTARG";
+            ;;
+        
         L)
             LOG_LEVEL="$OPTARG";
             ;;
@@ -372,8 +387,20 @@ if test -n "$BUILDSPEC"; then
 fi
 
 test -z "$MODULE" && usage "no module specified";
-test -z "$author" && usage "no author specified";
 test -z "$description" && usage "no description";
+
+if test -z "$author"; then
+    if test -n "$GIT"; then
+        author=$($GIT config --global --get user.name 2>/dev/null)
+        email=$($GIT config --global --get user.email 2>/dev/null)
+        
+        if test -n "$email"; then
+            author="$author <$email>"
+        fi
+    fi
+    
+    test -z "$author" && usage "no author specified";
+fi
 
 if test -n "$dependency_file"; then
     if test -z "$CORE_MODULES"; then
@@ -392,13 +419,13 @@ destdir=${destdir:-$(pwd)}
 if test -n "$git_project"; then
     tmp_gitdir=$(mktemp -d)
     PROJECT_HOME=$tmp_gitdir
-    git clone $git_project $PROJECT_HOME
+    $GIT clone $git_project $PROJECT_HOME
     cd $PROJECT_HOME
     set -e -o pipeline
     if test -e configure.ac; then
         autoreconf -i --force && ./configure --with-perlibdir=yes && make
     fi
-else
+elif test -z "$PROJECT_HOME"; then
     find_git_home
 fi
 
@@ -638,11 +665,13 @@ else
     test -n "$VERBOSE" && tree
     test -n "$VERBOSE" && cat Makefile.PL
     
-    if perltidy Makefile.PL; then
-        mv Makefile.PL.tdy Makefile.PL;
+    if test -n "$PERLTIDY"; then
+        if $PERLTIDY Makefile.PL; then
+            mv Makefile.PL.tdy Makefile.PL;
+        fi
     fi
-       
-    if perl Makefile.PL; then
+    
+    if $PERL Makefile.PL; then
         make manifest
         make dist
         cp *.tar.gz $destdir
