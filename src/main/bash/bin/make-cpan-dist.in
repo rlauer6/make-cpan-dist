@@ -218,6 +218,7 @@ function scan() {
         if [ "$CORE_MODULES" = "--no-core-modules" ]; then
             NOCORE="--no-core"
         fi
+
         scandeps-static.pl $NOCORE -r $scan_target >> $requires_file
         DEBUG $(echo "SCAN:" && cat $requires_file)
     fi
@@ -492,7 +493,7 @@ all_files=$(mktemp)
 
 test -n "$bindir"&& find ${PROJECT_HOME}/${bindir} $maxdepth -type f -executable > $all_files;
 
-test -n "$scriptsdir" && find ${PROJECT_HOME}/${scriptsdir} $maxdepth -type f -executable >> $all_files;
+test -n "$scriptsdir" && find -L ${PROJECT_HOME}/${scriptsdir} $maxdepth -type f -executable >> $all_files;
 
 test -s $all_files && sort -u $all_files > $exe_files
 
@@ -502,7 +503,7 @@ rm $all_files
 # set 'recurse' to 'no' and 'provides' to some value to specify your
 # own set of files to package
 if [ "$recurse_directories" = "yes" ]; then
-    find ${PROJECT_HOME}/${perl5libdir} -name '*.pm' > $package_files;
+    find -L ${PROJECT_HOME}/${perl5libdir} -name '*.pm' > $package_files;
 else
     if test -n "$provides"; then
         if test -s "$provides"; then
@@ -579,7 +580,7 @@ else
 fi
 
 depfile=$(mktemp)
-awk '{print $1 " " $2}' ${workdir}/requires.tmp | sort -u | grep -v '^perl' > $depfile
+awk '{print $1}' ${workdir}/requires.tmp | sort -u | grep -v '^perl' > $depfile
 
 # remove provided files from required list
 
@@ -595,7 +596,7 @@ if test -n "$testsdir"; then
     if test -d "${PROJECT_HOME}/$testsdir"; then
         testsfile=$(mktemp);
 
-        find ${PROJECT_HOME}/$testsdir -type f -name '*.t' -printf "%f\n" > $testsfile
+        find -L ${PROJECT_HOME}/$testsdir -type f -name '*.t' > $testsfile
         
         if ! test -s "$testsfile"; then
             INFO "no tests found in [$testsdir]...proceeding anyway."
@@ -605,7 +606,7 @@ if test -n "$testsdir"; then
         
         mkdir ${builddir}/t
         for a in $(cat $testsfile); do
-            cp ${PROJECT_HOME}/${testsdir}/$a ${builddir}/t/
+            cp $a ${builddir}/t/
         done
     else
         FATAL_ERROR "no test directory [${PROJECT_HOME}/$testsdir]"
@@ -618,7 +619,7 @@ if test -n "$test_dependency_file"; then
 else
     if test -n "$testsfile"; then
         for a in $(cat $testsfile); do
-            scan $PROJECT_HOME/$a ${workdir}/test-requires.tmp
+            scan $a ${workdir}/test-requires.tmp
         done
                 
         # remove provided files from required list

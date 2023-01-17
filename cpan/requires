@@ -1,0 +1,5 @@
+IO::Scalar 2.111
+JSON::PP 0
+ReadonlyX 1.04
+Text::CSV_XS 0
+List::Util 1.29

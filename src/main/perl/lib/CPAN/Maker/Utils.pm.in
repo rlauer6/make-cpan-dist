@@ -25,7 +25,7 @@ sub make_path_from_module {
   my $file = join $SLASH, split /$DOUBLE_COLON/xsm, $module;
 
   return "$file.pm";
-} ## end sub make_path_from_module
+}
 
 ########################################################################
 sub get_module_version {
@@ -34,7 +34,7 @@ sub get_module_version {
 
   if ( !@include_path ) {
     @include_path = $DOT;
-  } ## end if ( !@include_path )
+  }
 
   my ( $module, $version ) = split /\s+/xsm, $module_w_version;
 
@@ -60,10 +60,10 @@ sub get_module_version {
       = eval { return ExtUtils::MM->parse_version($path) // 0; };
 
     last;
-  } ## end foreach my $prefix (@include_path)
+  }
 
   return \%module_version;
-} ## end sub get_module_version
+}
 
 ########################################################################
 sub is_core {
@@ -74,12 +74,27 @@ sub is_core {
 
   if ($perl_version) {
     $perl_version = version->parse($perl_version);
-  } ## end if ($perl_version)
+  }
 
-  my @ms = Module::CoreList->find_modules(qr/\A$module\z/xsm);
+  my @ms
+    = Module::CoreList->find_modules( qr/\A$module\z/xsm, $perl_version );
 
-  return @ms ? $TRUE : $FALSE;
-} ## end sub is_core
+  return $FALSE
+    if !@ms;
+
+  # is core and we don't care about version
+  return $TRUE
+    if @ms && ( !$perl_version || !$version );
+
+  my $modules = Module::CoreList->find_version($perl_version);
+
+  # return false if the version we want is > then provided by CORE
+  if ( version->parse($version) > version->parse( $modules->{$module} ) ) {
+    return $FALSE;
+  }
+
+  return $TRUE;
+}
 
 ########################################################################
 sub trim {
@@ -91,7 +106,7 @@ sub trim {
   $s =~ s/^\s*(.*?)$/$1/xsm;
 
   return $s;
-} ## end sub trim
+}
 
 1;
 

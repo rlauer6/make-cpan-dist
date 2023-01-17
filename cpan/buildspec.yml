@@ -1,12 +1,13 @@
-version: 0.1
-
+min-perl-version: 5.010
 project:
   description: "File processing utility"
   author:
     name: Rob Lauer
     mailto: rlauer6@comcast.net
 pm_module: File::Process
+dependencies:
+  requires: requires
 path:
-  tests: ../src/main/perl/lib/t
-  pm_module: ../src/main/perl/lib
-  recurse: no
+  tests: t
+  pm_module: lib 
+  recurse: yes

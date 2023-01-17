@@ -1,4 +1,33 @@
-Wed Jan 11 08:56:41 2023  Rob Lauer  <rlauer@usgn.net>
+Tue Jan 17 11:03:38 2023  Rob Lauer  <rlauer6@comast.net>
+
+	[1.5.25]:
+
+	* VERSION: bump
+	* cpan/requires: new
+	* cpan/buildspec.yml
+	- use local directories that are symlinks
+	- min-perl-version: 5.16
+	- requires: requires
+	* src/main/perl/lib/t/04-process.t: unit test for process_csv()
+	* src/main/perl/lib/File/Process/Utils.pm.in: new
+	* src/main/perl/lib/Makefile.am: add above to build
+	* src/main/bash/bin/make-cpan-dist.in
+	- follow symlinks when 'find'ing files
+	- write full name of test file to temp file
+	- no need to use PROJECT_HOME for test files (due to above)
+	- remove version when looking for provides
+	* src/main/perl/lib/File/Process.pm.in
+	- minor formatting changes
+	- ref to File::Process::Utils in pod
+	* src/main/perl/lib/CPAN/Maker/Utils.pm.in
+	(is_core)
+	- consider a module non-core if required version > that provided by CORE
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- follow symlinks
+	* Makefile: new
+	* .gitignore: new
+
+Wed Jan 11 08:56:41 2023  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.24]:
 
@@ -14,7 +43,7 @@ Wed Jan 11 08:56:41 2023  Rob Lauer  <rlauer@usgn.net>
 	- test for git if -g option
 	- set default for from git config if missing
 
-Sun Jan  8 11:07:57 2023  Rob Lauer  <rlauer@usgn.net>
+Sun Jan  8 11:07:57 2023  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.23]:
 	* VERSION: bump
@@ -24,7 +53,7 @@ Sun Jan  8 11:07:57 2023  Rob Lauer  <rlauer@usgn.net>
 	- don't overwrite extra-files
 	- set exta-files entry to empty list if undef
 
-Sun Jan  8 08:42:43 2023  Rob Lauer  <rlauer@usgn.net>
+Sun Jan  8 08:42:43 2023  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.22]:
 	* README.md.in: minor changes
@@ -47,7 +76,7 @@ Mon Dec  5 11:36:16 2022  Rob Lauer  <rlauer6@comcast.net>
 	* src/main/perl/bin/make-cpan-dist.pl.in
 	- add support for --min-perl-version
 
-Fri Sep  2 11:01:41 2022  Rob Lauer  <rlauer@usgn.net>
+Fri Sep  2 11:01:41 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.20 - scriptsdir]:
 	* src/main/perl/lib/make-cpan-dist.pl.in
@@ -64,7 +93,7 @@ Fri Sep  2 11:01:41 2022  Rob Lauer  <rlauer@usgn.net>
 	- -S script files
 	(find_git_home): assume cwd is project_home
 
-Tue Aug  2 07:50:29 2022  Rob Lauer  <rlauer@usgn.net>
+Tue Aug  2 07:50:29 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.19 - versions]:
 	* src/main/perl/bin/make-cpan-dist.pl.in
@@ -72,21 +101,21 @@ Tue Aug  2 07:50:29 2022  Rob Lauer  <rlauer@usgn.net>
 	- == version, not @ version
 	- do not add a minium version of perl by default
 
-Thu Jul 28 15:00:15 2022  Rob Lauer  <rlauer@usgn.net>
+Thu Jul 28 15:00:15 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.18 - perl version]:
 	* src/main/perl/bin/make-cpan-dist.pl.in
 	(get_perl_version): new
 	(main): get perl version from requires
 
-Fri Jul 22 08:54:47 2022  Rob Lauer  <rlauer@usgn.net>
+Fri Jul 22 08:54:47 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.17 - ExtUtils::MakeMaker]:
 	* src/main/perl/bin/make-cpan-dist.pl.in
 	- specficy minimum version of ExtUtils::MakeMaker (6.64)
 	* VERSION: bump
 
-Wed Jul 13 16:14:24 2022  Rob Lauer  <rlauer@usgn.net>
+Wed Jul 13 16:14:24 2022  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.16 - no-core]:
 	* src/main/bash/bin/make-cpan-dist.in

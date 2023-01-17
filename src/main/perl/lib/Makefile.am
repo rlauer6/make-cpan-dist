@@ -14,27 +14,38 @@ ax_perl5_extra_includes = @ax_perl5_extra_includes@
 FILE_PERLMODULES = \
     File/Process.pm.in
 
+FILE_PROCESS_PERLMODULES = \
+    File/Process/Utils.pm.in
+
 CPAN_PERLMODULES = \
     CPAN/Maker/Utils.pm.in \
     CPAN/Maker/Constants.pm.in
 
 PERLMODULES = \
     $(FILE_PERLMODULES) \
+    $(FILE_PROCESS_PERLMODULES) \
     $(CPAN_PERLMODULES)
 
-GFILE_PERLMODULES = $(FILE_PERLMODULES:.pm.in=.pm)
-GCPAN_PERLMODULES = $(CPAN_PERLMODULES:.pm.in=.pm)
-GPERLMODULES      = $(PERLMODULES:.pm.in=.pm)
+GFILE_PERLMODULES         = $(FILE_PERLMODULES:.pm.in=.pm)
+GFILE_PROCESS_PERLMODULES = $(FILE_PROCESS_PERLMODULES:.pm.in=.pm)
+GCPAN_PERLMODULES         = $(CPAN_PERLMODULES:.pm.in=.pm)
+GPERLMODULES              = $(PERLMODULES:.pm.in=.pm)
 
 G3MANPAGES = $(GPERLMODULES:.pm=.3man)
 
 filedir = $(perl5libdir)/File
 file_DATA = $(GFILE_PERLMODULES)
 
+file_processdir = $(perl5libdir)/File/Process
+file_process_DATA = $(GFILE_PROCESS_PERLMODULES)
+
 cpan_makerdir = $(perl5libdir)/CPAN/Maker
 cpan_maker_DATA = $(GCPAN_PERLMODULES)
 
-dist_noinst_DATA = $(FILE_PERLMODULES) $(CPAN_PERLMODULES)
+dist_noinst_DATA = \
+    $(FILE_PERLMODULES) \
+    $(FILE_PROCESS_PERLMODULES) \
+    $(CPAN_PERLMODULES)
 
 man3_MANS = $(G3MANPAGES)
 
@@ -73,7 +84,9 @@ $(G3MANPAGES): %.3man : %.pm
 	--center="$(PACKAGE)" \
 	--name="$${tname}" \
 	--release=$(PACKAGE)-$(VERSION) \
-	--section=3man $< "$${target_name}" || touch "$${target_name}"
+	--section=3man $< "$${target_name}" || touch "$${target_name}"; \
+	new_name=$$(echo "$$target_name" | sed -e 's/\//::/g'); \
+	echo "man: $$target_name $$new_name"
 
 .PHONY: clean-local
 clean-local:
@@ -86,11 +99,15 @@ clean-generated-man-pages:
 	  rm -f "$$f" ;\
 	done
 
-install-data-hook:
-	for a in $(G3MANPAGES); do \
+AUTOMAKE_OPTIONS = no-installman
+
+install-data-hook: $(G3MANPAGES)
+	set -x;	for a in $(G3MANPAGES); do \
 	  target_name=$$(echo "$$a" | sed -e 's/\//::/g'); \
-	  mv $(DESTDIR)$(mandir)/man3/$$(basename $$a) \
-	     $(DESTDIR)$(mandir)/man3/$${target_name}; \
+	  install_dir=$(DESTDIR)$(mandir)/man3; \
+	  test -d $$install_dir || mkdir -p $$install_dir; \
+	  cp $(builddir)/$$a \
+	     $$install_dir/$${target_name}; \
 	done
 
 uninstall-local:

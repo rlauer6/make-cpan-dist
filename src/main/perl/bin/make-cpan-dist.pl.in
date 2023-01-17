@@ -445,9 +445,11 @@ sub write_file_list {
 
     if ( -d $fqp ) {
       find(
-        sub {
-          if ( !/^[.]+$/xsm ) {
-            push @expanded_list, "$File::Find::name $destdir/$_";
+        { follow => $TRUE,
+          wanted => sub {
+            if ( !/^[.]+$/xsm ) {
+              push @expanded_list, "$File::Find::name $destdir/$_";
+            }
           }
         },
         $fqp
