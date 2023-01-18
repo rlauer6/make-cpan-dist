@@ -68,6 +68,8 @@ PERLINCLUDE = \
 	$(do_subst) $< > $@
 	$(perlwc) $(PERLINCLUDE) -wc $@ || { rm $@ && exit 1; }
 
+$(GFILE_PERLMODULES): File/Process/Utils.pm
+
 CPAN/Maker/Utils.pm: CPAN/Maker/Utils.pm.in CPAN/Maker/Constants.pm
 	test -d "$$(dirname "$@")" || $(INSTALL) -d "$$(dirname "$@")"
 	$(do_subst) $< > $@

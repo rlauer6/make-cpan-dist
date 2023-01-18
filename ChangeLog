@@ -1,3 +1,46 @@
+Wed Jan 18 10:15:49 2023  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.27]:
+	* VERSION: bump
+	* src/main/perl/lib/File/Process.pm.in
+	- moved constants to File/Process/Utils.pm.in
+	- export process_csv
+	- pod tweaks
+	(process_file): don't require return value from pre to be an array
+	(process_csv)
+	- new, pass thru to File::Process::Utils::process_csv()
+	* src/main/perl/lib/File/Process/Utils.pm.in
+	- moved constants from File/Process.pm to here
+	- added hooks
+	- autogeneration of column key names
+	- column_name array can be sent as column headings
+	- fixed bug when no header is specified
+	- added skip_list option for process_csv
+	- added max_rows limit
+	(process_csv)
+	- return values from process_file()
+	* src/main/perl/lib/Makefile.am
+	- File::Process depends on File::Process::Utils
+
+	[unit tests]:
+	* src/main/perl/lib/t/00-process.t: remove ReadonlyX
+	* src/main/perl/lib/t/01-process.t: likewise
+	* src/main/perl/lib/t/02-process.t: likewise
+	* src/main/perl/lib/t/03-process.t: likewise
+	* src/main/perl/lib/t/04-process.t
+	- unit tests for new features
+
+Tue Jan 17 20:53:03 2023  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.26]:
+	* VERSION: bump
+	* src/main/perl/lib/File/Process/Utils.pm.in
+	(process_csv):
+	- send all options down the pike
+	- if no header, check for column names, else return array
+	* src/main/perl/lib/t/04-process.t
+	- unit tests to support no-headers situation
+
 Tue Jan 17 11:03:38 2023  Rob Lauer  <rlauer6@comast.net>
 
 	[1.5.25]:
