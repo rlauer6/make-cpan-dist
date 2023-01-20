@@ -1,3 +1,16 @@
+Fri Jan 20 04:58:03 2023  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.28]:
+	* VERSION: bump
+	* cpan/.gitignore: remove test-requires from ignore list
+	* cpan/Makefile
+	- add test-requires as a dependency
+	(clean): rm all .tar.gz
+	* cpan/buildspec.yml: add test-requires
+	* cpan/test-requires: new
+	* src/main/perl/lib/File/Process.pm.in: bump version only
+	* src/main/perl/lib/File/Process/Utils.pm.in: likewise
+
 Wed Jan 18 10:15:49 2023  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.27]:

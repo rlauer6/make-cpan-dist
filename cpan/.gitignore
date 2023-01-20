@@ -1,6 +1,5 @@
 !Makefile
-provides
-test-requires
 t
+provides
 lib/**
 File-Process*

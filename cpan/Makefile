@@ -29,12 +29,12 @@ cpan: $(TARBALL)
 
 BUILDSPEC = buildspec.yml
 
-$(TARBALL): buildspec.yml $(MODULE_LIST)
+$(TARBALL): buildspec.yml $(MODULE_LIST) test-requires requires
 	set -x;
 	$(MAKE_CPAN_DIST) -b $<
 
 clean:
-	rm -f $(TARBALL)
+	rm -f *.tar.gz
 
 upload: $(TARBALL)
 	export PAUSE_USER=BIGFOOT; \
