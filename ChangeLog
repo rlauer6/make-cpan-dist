@@ -1,3 +1,12 @@
+Tue Jan 24 12:05:01 2023  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.29]:
+	* src/main/bash/bin/make-cpan-dist.in
+	- -n option to not include "required" modules
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(parse_dependencies): likewise
+	* bootstrap: --with-perl5libdir
+
 Fri Jan 20 04:58:03 2023  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.28]:

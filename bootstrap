@@ -11,7 +11,7 @@ function _bump {
     
     if test -x bootstrap; then
         ./bootstrap
-        ./configure
+        ./configure --with-perl5libdir
     fi
 }
 

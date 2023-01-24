@@ -29,6 +29,7 @@ Options
 -L log level    - logging level 1=error, 5=trace
 -m name         - module name
 -M perl version - minimum perl version
+-n no require   - do not include 'require' modules
 -o dir          - output directory (default: current directory)
 -p              - preserve Makefile.PL
 -P file         - file that contains a list of modules to be packaged
@@ -219,7 +220,7 @@ function scan() {
             NOCORE="--no-core"
         fi
 
-        scandeps-static.pl $NOCORE -r $scan_target >> $requires_file
+        scandeps-static.pl $NO_INCLUDE_REQUIRE $NOCORE -r $scan_target >> $requires_file
         DEBUG $(echo "SCAN:" && cat $requires_file)
     fi
 }
@@ -235,7 +236,7 @@ PERLTIDY=$(command -v perltidy);
 # required
 PERL=$(command -v perl);
 
-while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:" arg "$@"; do
+while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:n" arg "$@"; do
 
     case "${arg}" in
 
@@ -309,6 +310,9 @@ while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:" arg "$@"; do
         M)  MIN_PERL_VERSION="$OPTARG";
             ;;
 
+        n)
+            NO_INCLUDE_REQUIRE="--no-include-require"
+            ;;
         o)
             destdir="$OPTARG";
             ;;

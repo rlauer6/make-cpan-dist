@@ -601,7 +601,8 @@ sub parse_dependencies {
     croak 'malformed buildspec.yml file - dependencies section with no keys?'
       if !keys %{$dependencies};
 
-    $dependencies->{core_modules} //= 'no';
+    $dependencies->{core_modules}     //= 'no';
+    $dependencies->{required_modules} //= 'yes';
 
     if ( $dependencies->{path} ) { # deprecatd
       $args{D} = $dependencies->{path};
@@ -622,6 +623,10 @@ sub parse_dependencies {
 
     if ( $dependencies->{core_modules} eq 'yes' ) {
       $args{c} = $EMPTY;
+    }
+
+    if ( $dependencies->{required_modules} eq 'no' ) {
+      $args{n} = $EMPTY;
     }
 
     if ( my $resolver = $dependencies->{resolver} ) {
@@ -1037,6 +1042,7 @@ dependencies:
   test_requires: "type:string"
   build_requires: "type:string"
   core_modules: "type::boolean"
+  required_modules: "type:boolean"
 path:
   recurse: "type:boolean"
   pm_module: "type:string"
@@ -1196,6 +1202,7 @@ current working directory.
     path: requires
     requires: requires
     test_requires: test-requires
+    required_modules: no
   path:
     recurse: yes
     pm_module: src/main/perl/lib
