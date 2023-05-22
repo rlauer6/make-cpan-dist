@@ -78,6 +78,7 @@ CPAN/Maker/Utils.pm: CPAN/Maker/Utils.pm.in CPAN/Maker/Constants.pm
 CLEANFILES = $(GPERLMODULES)
 
 $(G3MANPAGES): %.3man : %.pm
+	podchecker $<
 	set -x; \
 	target_name="$@"; \
 	echo $$target_name; \
@@ -100,6 +101,8 @@ clean-generated-man-pages:
 	  echo "$$f"; \
 	  rm -f "$$f" ;\
 	done
+
+manpages: $(G3MANPAGES)
 
 AUTOMAKE_OPTIONS = no-installman
 

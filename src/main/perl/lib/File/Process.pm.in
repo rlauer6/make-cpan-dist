@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Carp;
-use English qw(-no_match_vars);
+use English              qw(-no_match_vars);
 use File::Process::Utils qw(:booleans :chars);
 use IO::Scalar;
 use Scalar::Util qw( openhandle );
@@ -24,7 +24,7 @@ our %DEFAULT_PROCESSORS = (
 
 use parent qw(Exporter);
 
-our @EXPORT = qw( process_file ); ## no critic (ProhibitAutomaticExportation)
+our @EXPORT = qw( process_file );  ## no critic (ProhibitAutomaticExportation)
 
 our @EXPORT_OK = qw(
   post
@@ -118,10 +118,10 @@ sub _pre {
   if ( openhandle $file ) {
     $fh = $file;
 
-    $args->{file} = ref $fh; # GLOB
+    $args->{file} = ref $fh;  # GLOB
   }
   else {
-    open $fh, '<', $file     ## no critic (RequireBriefOpen)
+    open $fh, '<', $file      ## no critic (RequireBriefOpen)
       or croak 'could not open ' . $file . $NL;
 
     $args->{'file'} = $file;
@@ -227,31 +227,31 @@ sub _post {
 }
 
 ########################################################################
-sub post { ## no critic [Subroutines::RequireArgUnpacking]
+sub post {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{post}->(@_);
 }
 
 ########################################################################
-sub filter { ## no critic [Subroutines::RequireArgUnpacking]
+sub filter {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{filter}->(@_);
 }
 
 ########################################################################
-sub pre { ## no critic [Subroutines::RequireArgUnpacking]
+sub pre {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[1]->{default_processors}->{pre}->(@_);
 }
 
 ########################################################################
-sub process { ## no critic [Subroutines::RequireArgUnpacking]
+sub process {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{process}->(@_);
 }
 
 ########################################################################
-sub next_line { ## no critic [Subroutines::RequireArgUnpacking]
+sub next_line {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{next_line}->(@_);
 }
@@ -436,11 +436,15 @@ default processor methods using the tag ':all'.
 
 =head1 METHODS AND SUBROUTINES
 
-=head2 process_csv(file, options)
+=head2 process_csv
+
+ process_csv(file, options)
 
 See L<File::Process::Utils>
 
-=head2 process_file(file, options)
+=head2 process_file
+
+ process_file(file, options)
 
 You start the processing of the file by calling C<process_file> with
 the name of the file or a handle to an open file and a B<list> of
@@ -534,7 +538,7 @@ for the C<next_line()> hook
 C<process()> hooks will prevent a line from being accumulated in the
 line buffer
 
-=item *Any hook you define can terminate the process by throwing
+=item * Any hook you define can terminate the process by throwing
 an exception.
 
 =back

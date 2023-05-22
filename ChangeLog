@@ -1,3 +1,12 @@
+Mon May 22 16:23:56 2023  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.30]:
+	* src/main/perl/lib/CPAN/Maker/Constants.pm.in: pod
+	* src/main/perl/lib/CPAN/Maker/Utils.pm.in: likewise
+	* src/main/perl/lib/File/Process.pm.in: likewise
+	* src/main/perl/lib/File/Process/Utils.pm.in: likewise
+	* src/main/perl/lib/Makefile.am: podchecker
+
 Tue Jan 24 12:05:01 2023  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.29]:

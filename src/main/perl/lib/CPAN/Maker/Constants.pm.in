@@ -5,7 +5,7 @@ use warnings;
 
 use parent qw{ Exporter };
 
-our $VERSION = '@PACKAGE_VERSION@';
+our $VERSION = '@PACKAGE_VERSION@';  ## no critic (RequireInterpolation)
 
 our @EXPORT_OK = ();
 
@@ -74,4 +74,30 @@ $EXPORT_TAGS{'all'} = [@EXPORT_OK];
 
 1;
 
+## no critic (RequirePodSections)
+
 __END__
+
+=pod
+
+=head1 NAME
+
+CPAN::Maker::Constants - constants to support CPAN::Maker
+
+=head1 SYNOPSIS
+
+ use CPAN::Maker::Constants qw(all);
+
+=head1 DESCRIPTION
+
+Import tags:
+
+ chars
+ booleans
+ defaults
+
+=head1 AUTHOR
+
+Rob Lauer - <rlauer6@comcast.net>
+
+=cut
