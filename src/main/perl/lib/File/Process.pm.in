@@ -12,7 +12,7 @@ use Data::Dumper;
 
 use parent qw( Exporter );
 
-our $VERSION = '0.11';
+our $VERSION = '0.13';
 
 our %DEFAULT_PROCESSORS = (
   pre       => \&_pre,
@@ -24,7 +24,7 @@ our %DEFAULT_PROCESSORS = (
 
 use parent qw(Exporter);
 
-our @EXPORT = qw( process_file );  ## no critic (ProhibitAutomaticExportation)
+our @EXPORT = qw( process_file ); ## no critic (ProhibitAutomaticExportation)
 
 our @EXPORT_OK = qw(
   post
@@ -118,10 +118,10 @@ sub _pre {
   if ( openhandle $file ) {
     $fh = $file;
 
-    $args->{file} = ref $fh;  # GLOB
+    $args->{file} = ref $fh; # GLOB
   }
   else {
-    open $fh, '<', $file      ## no critic (RequireBriefOpen)
+    open $fh, '<', $file     ## no critic (RequireBriefOpen)
       or croak 'could not open ' . $file . $NL;
 
     $args->{'file'} = $file;
@@ -227,31 +227,31 @@ sub _post {
 }
 
 ########################################################################
-sub post {  ## no critic [Subroutines::RequireArgUnpacking]
+sub post { ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{post}->(@_);
 }
 
 ########################################################################
-sub filter {  ## no critic [Subroutines::RequireArgUnpacking]
+sub filter { ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{filter}->(@_);
 }
 
 ########################################################################
-sub pre {  ## no critic [Subroutines::RequireArgUnpacking]
+sub pre { ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[1]->{default_processors}->{pre}->(@_);
 }
 
 ########################################################################
-sub process {  ## no critic [Subroutines::RequireArgUnpacking]
+sub process { ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{process}->(@_);
 }
 
 ########################################################################
-sub next_line {  ## no critic [Subroutines::RequireArgUnpacking]
+sub next_line { ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{next_line}->(@_);
 }
@@ -422,7 +422,7 @@ text file. The class exports one method (C<process_file>) which invokes
 multiple subroutines that you can override or use in conjunction with
 your custom processors.
 
-I<See L<File::Process::Utils> for additional recipes.>
+I<See C<File::Process::Utils> for additional recipes.>
 
 =head1 EXPORTED METHODS
 
@@ -807,7 +807,7 @@ modified under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-L<File::Process:Utils>
+L<File::Process::Utils>
 
 =head1 AUTHOR
 

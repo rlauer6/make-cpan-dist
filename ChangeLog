@@ -1,3 +1,8 @@
+Sat Nov 18 18:30:09 2023  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.31]:
+	* src/main/perl/lib/File/Process.pm.in: pod error
+
 Mon May 22 16:23:56 2023  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.30]:
