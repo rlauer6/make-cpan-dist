@@ -1,0 +1,39 @@
+name: make-cpan-dist
+on: [push]
+jobs:
+  test-module:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/rlauer6/test_5.36.0:latest
+      credentials:
+        username: rlauer6
+        password: ${{ secrets.DOCKER_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: addnab/docker-run-action@v3
+        with:
+          image: ghcr.io/rlauer6/test_5.36.0:latest
+          options: -v ${{github.workspace}}:/codebase
+          run: |
+            set -x
+            yum install -y git
+            export PATH=$PATH:/opt/perl-5.36.0/bin
+            cpanm -n -v \
+            JSON::PP \
+            File::Process \
+            YAML::Tiny \
+            Log::Log4perl \
+            Module::ScanDeps::Static
+            cd /codebase
+            git clone https://github.com/rlauer6/make-cpan-dist.git
+            cd make-cpan-dist; \
+            ./bootstrap
+            ./configure --with-perl5libdir=$(perl -MConfig -wle 'print $Config{sitelib};')
+            make && make install
+            cd cpan
+            mkdir t
+            mkdir -p lib/File
+            cp ../src/main/perl/lib/t/* t/
+            cp -r ../src/main/perl/lib/File/* lib/File/
+            make cpan
+            cpanm -l -v $(ls -1 *.tar.gz | head -1)

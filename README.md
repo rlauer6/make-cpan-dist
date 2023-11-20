@@ -1,5 +1,7 @@
 # README
 
+![badge](https://github.com/rlauer6/make-cpan-dist/actions/workflows/build.yml/badge.svg)
+
 This project is yet another attempt to create a repeatable, __easy to
 use__ script for creating CPAN distributions.
 
