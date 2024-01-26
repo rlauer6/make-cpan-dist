@@ -8,7 +8,7 @@ use strict;
 use warnings;
 
 use CPAN::Maker::Constants qw( :all );
-use CPAN::Maker::Utils qw( :all );
+use CPAN::Maker::Utils     qw( :all );
 
 use Carp;
 use Cwd;
@@ -18,10 +18,10 @@ use ExtUtils::MM;
 use File::Basename;
 use File::Find;
 use File::Process qw( process_file filter );
-use File::Temp qw( :POSIX );
-use Getopt::Long qw(:config no_ignore_case );
-use JSON::PP qw( encode_json decode_json );
-use List::Util qw( pairs );
+use File::Temp    qw( :POSIX );
+use Getopt::Long  qw(:config no_ignore_case );
+use JSON::PP      qw( encode_json decode_json );
+use List::Util    qw( pairs );
 use Log::Log4perl qw( :easy );
 use Log::Log4perl::Level;
 use Pod::Usage;
@@ -29,7 +29,7 @@ use Scalar::Util qw( reftype );
 use YAML::Tiny;
 use version;
 
-our $VERSION = '@PACKAGE_VERSION@'; ## no critic (RequireInterpolationOfMetachars)
+our $VERSION = '@PACKAGE_VERSION@';  ## no critic (RequireInterpolationOfMetachars)
 
 caller or __PACKAGE__->main();
 
@@ -307,16 +307,14 @@ sub write_makefile {
     $options{$d} = $options{$d} || $d;
   }
 
-  my $pre_req = Dumper get_requires( $options{'requires'}, $core,
-    $options{'min-perl-version'} );
+  my $pre_req = Dumper get_requires( $options{'requires'}, $core, $options{'min-perl-version'} );
   $pre_req = trim($pre_req);
-  $pre_req =~ s/\@(\d+)/== $1/xsmg;
+  $pre_req =~ s/([@]\d+)/== $2/xsmg;
 
   my $test_req = {};
 
   if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
-    $test_req = Dumper get_requires( $options{'test-requires'},
-      $core, $options{'min-perl-version'} );
+    $test_req = Dumper get_requires( $options{'test-requires'}, $core, $options{'min-perl-version'} );
   }
   else {
     $test_req = '{}';
@@ -328,8 +326,7 @@ sub write_makefile {
   my $build_req = {};
 
   if ( $options{'build-requires'} && -s $options{'build-requires'} ) {
-    $build_req = Dumper get_requires( $options{'build-requires'},
-      $TRUE, $options{'min-perl-version'} );
+    $build_req = Dumper get_requires( $options{'build-requires'}, $TRUE, $options{'min-perl-version'} );
     $build_req = trim($build_req);
   }
 
@@ -433,8 +430,7 @@ sub write_file_list {
 ########################################################################
   my (%args) = @_;
 
-  my ( $file_list, $destdir, $project_root )
-    = @args{qw(file_list destination project_root)};
+  my ( $file_list, $destdir, $project_root ) = @args{qw(file_list destination project_root)};
 
   my @expanded_list;
 
@@ -464,8 +460,7 @@ sub write_file_list {
       # to install the files during package installation...the
       # exception being if items are installed into share
       # directory
-      die
-        "ERROR: missing file in list ($fqp) - check your `extra-files` section\n"
+      die "ERROR: missing file in list ($fqp) - check your `extra-files` section\n"
         if !-e $fqp;
 
       my ( $name, $path, $ext ) = fileparse( $fqp, qr/[.][^.]+/xsm );
@@ -492,16 +487,14 @@ sub write_extra_files {
 
   DEBUG('writing extra-files');
 
-  my ( $extra_files, $extra, $project_root )
-    = @params{qw(extra_files extra project_root)};
+  my ( $extra_files, $extra, $project_root ) = @params{qw(extra_files extra project_root)};
 
   my %args = %{ $params{args} };
 
   $extra_files //= [];
 
   if ( !is_array($extra_files) ) {
-    croak "extra-files must be an array!\n"
-      . Dumper( [ $extra_files, \%params ] );
+    croak "extra-files must be an array!\n" . Dumper( [ $extra_files, \%params ] );
   }
 
   my $extra_files_path = $extra || 'extra-files';
@@ -511,10 +504,10 @@ sub write_extra_files {
   foreach my $e ( @{$extra_files} ) {
     DEBUG Dumper( [$e] );
 
-    if ( !ref $e ) { # simple file
+    if ( !ref $e ) {  # simple file
       push @file_list, $e;
     }
-    elsif ( is_hash($e) ) { # possibly dest => dir, or dest => list
+    elsif ( is_hash($e) ) {  # possibly dest => dir, or dest => list
       foreach my $destdir ( keys %{$e} ) {
         my ($destdir) = keys %{$e};
 
@@ -604,7 +597,7 @@ sub parse_dependencies {
     $dependencies->{core_modules}     //= 'no';
     $dependencies->{required_modules} //= 'yes';
 
-    if ( $dependencies->{path} ) { # deprecatd
+    if ( $dependencies->{path} ) {  # deprecatd
       $args{D} = $dependencies->{path};
       warn "path is deprecated: use requires\n";
     }
@@ -761,8 +754,7 @@ sub parse_buildspec {
 
   # set boolean args from options
 
-  my @boolean_args
-    = qw( verbose v cleanup !x scandeps s require-versions !A );
+  my @boolean_args = qw( verbose v cleanup !x scandeps s require-versions !A );
 
   foreach my $pair ( pairs @boolean_args ) {
     my ( $key, $value ) = @{$pair};
@@ -858,7 +850,7 @@ sub get_yaml_specfile {
 
       my $line = <$fh>;
 
-      return if $line =~ /^\=pod/xsm; # signal end of file
+      return if $line =~ /^\=pod/xsm;  # signal end of file
 
       return $line;
     }
@@ -884,8 +876,7 @@ sub validate_object {
       if ( ref $spec->{$k} ) {
         if ( !ref $obj->{$k}
           || reftype( $obj->{$k} ) ne reftype( $spec->{$k} ) ) {
-          warn "ERROR: wrong type for ($k) - $k must be "
-            . reftype( $spec->{$k} ) . "\n";
+          warn "ERROR: wrong type for ($k) - $k must be " . reftype( $spec->{$k} ) . "\n";
           $err++;
         }
         else {
@@ -894,7 +885,7 @@ sub validate_object {
       }
     }
   }
-  else { # just validate arrays are arrays for now, deep dive TBD
+  else {  # just validate arrays are arrays for now, deep dive TBD
     $err = reftype($spec) eq 'ARRAY';
   }
 
@@ -909,18 +900,12 @@ sub main {
   my %options = ( cleanup => 1, pager => 1 );
 
   GetOptions(
-    \%options,              'abstract|A=s',
-    'author|a=s',           'buildspec|b=s',
-    'build-requires|B=s',   'cleanup!',
-    'core-modules!',        'dryrun',
-    'debug|D',              'exe-files=s',
-    'help|h',               'log-level|l=s',
-    'module|m=s',           'require-versions|R!',
-    'min-perl-version|M=s', 'requires|r=s',
-    'pager|P!',             'project-root|p=s',
-    'scandeps|s',           'test-requires=s',
-    'verbose|V',            'version|v',
-    'work-dir|w=s',
+    \%options,            'abstract|A=s',        'author|a=s',           'buildspec|b=s',
+    'build-requires|B=s', 'cleanup!',            'core-modules!',        'dryrun',
+    'debug|D',            'exe-files=s',         'help|h',               'log-level|l=s',
+    'module|m=s',         'require-versions|R!', 'min-perl-version|M=s', 'requires|r=s',
+    'pager|P!',           'project-root|p=s',    'scandeps|s',           'test-requires=s',
+    'verbose|V',          'version|v',           'work-dir|w=s',
   );
 
   if ( $options{help} ) {
@@ -996,10 +981,10 @@ sub main {
     }
 
     if ( !$options{dryrun} ) {
-      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
     }
     else {
-      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL; ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
     }
   }
   else {
@@ -1009,7 +994,7 @@ sub main {
     croak 'no dependencies'
       if !$options{requires};
 
-    $options{author} = $options{author} // 'Anonyous <anonymous@example.com>';
+    $options{author}   = $options{author}   // 'Anonyous <anonymous@example.com>';
     $options{abstract} = $options{abstract} // 'my awesome Perl module!';
 
     if ( !write_makefile(%options) ) {

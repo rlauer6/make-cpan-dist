@@ -648,12 +648,14 @@ fi
 
 test -n "$DEBUG" && EXTRA_OPTIONS="--debug"
 
+REQUIRE_VERSION=$(test -z $ANY_VERSION || echo "-R")
+
 # create the Makefile.PL
 if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             $CORE_MODULES $BUILD_REQUIRES -r ${workdir}/requires \
             -e $exe_files $TESTREQUIRES  $min_perl_version \
             -w ${builddir} $EXTRA_OPTIONS \
-            -l $LOG_LEVEL \
+            -l $LOG_LEVEL $REQUIRE_VERSION \
             -m "$MODULE" \
             -A "$description" \
             -a "$author" > $builddir/Makefile.PL; then
