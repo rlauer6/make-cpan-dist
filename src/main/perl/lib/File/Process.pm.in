@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Carp;
-use English              qw(-no_match_vars);
+use English qw(-no_match_vars);
 use File::Process::Utils qw(:booleans :chars);
 use IO::Scalar;
 use Scalar::Util qw( openhandle );
@@ -12,7 +12,7 @@ use Data::Dumper;
 
 use parent qw( Exporter );
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 our %DEFAULT_PROCESSORS = (
   pre       => \&_pre,
@@ -24,7 +24,7 @@ our %DEFAULT_PROCESSORS = (
 
 use parent qw(Exporter);
 
-our @EXPORT = qw( process_file ); ## no critic (ProhibitAutomaticExportation)
+our @EXPORT = qw( process_file );  ## no critic (ProhibitAutomaticExportation)
 
 our @EXPORT_OK = qw(
   post
@@ -73,8 +73,7 @@ sub process_file {
   my ( $fh, $all_lines ) = $processors{'pre'}->( $file, \%args );
 
   if ( !$fh || !ref $all_lines ) {
-    croak
-      "invalid pre processor return values: wanted file handle, array ref\n";
+    croak "invalid pre processor return values: wanted file handle, array ref\n";
   }
 
   LINE: while (1) {
@@ -85,8 +84,7 @@ sub process_file {
 
     foreach my $p ( @processors{qw( filter process )} ) {
 
-      $current_line
-        = eval { return $p->( $fh, $all_lines, \%args, $current_line ); };
+      $current_line = eval { return $p->( $fh, $all_lines, \%args, $current_line ); };
 
       last LINE if $EVAL_ERROR;
 
@@ -118,10 +116,10 @@ sub _pre {
   if ( openhandle $file ) {
     $fh = $file;
 
-    $args->{file} = ref $fh; # GLOB
+    $args->{file} = ref $fh;  # GLOB
   }
   else {
-    open $fh, '<', $file     ## no critic (RequireBriefOpen)
+    open $fh, '<', $file      ## no critic (RequireBriefOpen)
       or croak 'could not open ' . $file . $NL;
 
     $args->{'file'} = $file;
@@ -227,31 +225,31 @@ sub _post {
 }
 
 ########################################################################
-sub post { ## no critic [Subroutines::RequireArgUnpacking]
+sub post {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{post}->(@_);
 }
 
 ########################################################################
-sub filter { ## no critic [Subroutines::RequireArgUnpacking]
+sub filter {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{filter}->(@_);
 }
 
 ########################################################################
-sub pre { ## no critic [Subroutines::RequireArgUnpacking]
+sub pre {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[1]->{default_processors}->{pre}->(@_);
 }
 
 ########################################################################
-sub process { ## no critic [Subroutines::RequireArgUnpacking]
+sub process {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{process}->(@_);
 }
 
 ########################################################################
-sub next_line { ## no critic [Subroutines::RequireArgUnpacking]
+sub next_line {  ## no critic [Subroutines::RequireArgUnpacking]
 ########################################################################
   return $_[2]->{default_processors}->{next_line}->(@_);
 }
@@ -331,8 +329,7 @@ END_OF_TEXT
 
   $fh = IO::Scalar->new( \$json_text );
 
-  print Dumper(
-    decode_json( process_file( $fh, merge_lines => 1, chomp => 1 ) ) );
+  print Dumper( decode_json( process_file( $fh, merge_lines => 1, chomp => 1 ) ) );
 
   # +-----------------+
   # | READ A CSV FILE |
@@ -382,7 +379,7 @@ __END__
 
 =head1 NAME
 
-File::Process - process text files with customer handlers
+File::Process - process text files with custom handlers
 
 =head1 SYNOPSIS
 

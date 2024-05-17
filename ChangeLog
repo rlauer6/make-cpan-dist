@@ -1,3 +1,9 @@
+Fri May 17 11:53:56 2024  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.34]:
+	* VERSION: bump
+	* src/main/perl/lib/File/Process.pm.in: pod typo
+
 Fri Jan 26 17:06:45 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.33]:
