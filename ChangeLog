@@ -1,3 +1,20 @@
+Tue May 21 14:41:46 2024  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.35]:
+	* VERSION: bump
+	* src/main/bash/bin/make-cpan-dist.in
+	- add -F postamble option
+	- add -y PL_FILES option
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- --pl-files option
+	(write_pl_files): new
+	(write_makefile)
+	- read pl-files and format PL_FILES section
+	- support custom postamble section
+	(parse_buildspec)
+	- create a pl_files file from buildspec
+	- set F option if postamble option
+
 Fri May 17 11:53:56 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.34]:

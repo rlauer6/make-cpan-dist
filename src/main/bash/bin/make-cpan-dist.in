@@ -25,6 +25,7 @@ Options
 -h              - help
 -H project home - project home, defaults to '..'
 -f file         - file containing a list of extra files to include
+-F postamble    - file containing additional make instructions
 -l path         - path to Perl modules
 -L log level    - logging level 1=error, 5=trace
 -m name         - module name
@@ -40,6 +41,7 @@ Options
 -t path         - path to test files
 -v              - more verbose output
 -x              - do not cleanup files
+-y              - name of a file containing PL_FILES entries
 
 * NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment
   variables.
@@ -220,7 +222,7 @@ function scan() {
             NOCORE="--no-core"
         fi
 
-        scandeps-static.pl $NO_INCLUDE_REQUIRE $NOCORE -r $scan_target >> $requires_file
+        @PERL_REQUIRES@ $NO_INCLUDE_REQUIRE $NOCORE -r $scan_target >> $requires_file
         DEBUG $(echo "SCAN:" && cat $requires_file)
     fi
 }
@@ -236,7 +238,7 @@ PERLTIDY=$(command -v perltidy);
 # required
 PERL=$(command -v perl);
 
-while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:n" arg "$@"; do
+while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:" arg "$@"; do
 
     case "${arg}" in
 
@@ -279,6 +281,9 @@ while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:n" arg "$@"; do
             EXTRA="$OPTARG";
             ;;
 
+        F)
+            POSTAMBLE="$OPTARG";
+            ;;
         g)
             git_project="$OPTARG";
 
@@ -356,6 +361,10 @@ while getopts "h?Ab:B:D:e:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:n" arg "$@"; do
 
         x)
             NOCLEANUP="1";
+            ;;
+
+        y)
+            PL_FILE="$OPTARG";
             ;;
 
         z)
@@ -650,12 +659,23 @@ test -n "$DEBUG" && EXTRA_OPTIONS="--debug"
 
 REQUIRE_VERSION=$(test -z $ANY_VERSION || echo "-R")
 
+if test -n "$PL_FILE"; then
+  PL_FILE_OPTS=$(cat $PL_FILE)
+fi
+
+# extra Makefile instructions
+if test -n "$POSTAMBLE"; then
+    if test -e "$POSTAMBLE"; then
+        cp $POSTAMBLE $builddir/postamble
+    fi
+fi
+
 # create the Makefile.PL
 if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
             $CORE_MODULES $BUILD_REQUIRES -r ${workdir}/requires \
             -e $exe_files $TESTREQUIRES  $min_perl_version \
             -w ${builddir} $EXTRA_OPTIONS \
-            -l $LOG_LEVEL $REQUIRE_VERSION \
+            -l $LOG_LEVEL $PL_FILE_OPTS $REQUIRE_VERSION \
             -m "$MODULE" \
             -A "$description" \
             -a "$author" > $builddir/Makefile.PL; then
