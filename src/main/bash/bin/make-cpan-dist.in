@@ -96,7 +96,22 @@ function TRACE {
 ########################################################################
 function module2path {
 ########################################################################
-    echo "$(echo $1 | perl -npe 's/::/\//g').pm"
+    module="$1";
+
+    path="$(echo $1 | perl -npe 's/::/\//g').pm"
+    if test -e "$path"; then
+        echo $path;
+        return;
+    fi
+
+    root="${PROJECT_HOME}/${perl5libdir}/"
+
+    for a in $(find $root -name '*.pm'); do
+        if grep -q "^package $module;" $a; then
+            echo "${a##$root}";
+            return;
+        fi
+    done
 }
 
 # look for project home directory from here back, sets PROJECT_HOME

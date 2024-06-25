@@ -15,7 +15,7 @@ use Cwd;
 use Data::Dumper;
 use English qw( -no_match_vars );
 use ExtUtils::MM;
-use File::Basename qw(basename);
+use File::Basename qw(basename fileparse);
 use File::Find;
 use File::Process qw( process_file filter );
 use File::Temp qw( :POSIX );
@@ -482,30 +482,65 @@ END_OF_MAKEFILE
 }
 
 ########################################################################
-sub write_file_list {
+sub fetch_file_list {
 ########################################################################
   my (%args) = @_;
 
-  my ( $file_list, $destdir, $project_root ) = @args{qw(file_list destination project_root)};
+  my ( $file_list, $destdir, $project_root ) = @args{qw(file_list destination project_root exclude)};
 
   my @expanded_list;
+  my @exclude = grep {/^!/xsm} @{$file_list};
 
-  foreach my $f ( @{$file_list} ) {
+  foreach (@exclude) {
+    s/^!//xsm;
+  }
+
+  foreach my $f ( grep { !/^!/xsm } @{$file_list} ) {
     my $fqp = sprintf '%s/%s', $project_root, $f;
 
-    DEBUG Dumper( [ 'write_file_list:', $fqp ] );
+    DEBUG Dumper( [ 'fetch_file_list:', $fqp ] );
+
+    # no recurse of directories!
+    my $cwd = cwd();
 
     if ( -d $fqp ) {
-      find(
-        { follow => $TRUE,
-          wanted => sub {
-            if ( !/^[.]+$/xsm ) {
-              push @expanded_list, "$File::Find::name $destdir/$_";
+      eval {
+        find(
+          { follow => $TRUE,
+            wanted => sub {
+              return
+                if /^[.]/xsm || -d $_;
+
+              die 'done'
+                if cwd() ne $fqp;
+
+              my $name = $_;
+
+              foreach my $e (@exclude) {
+
+                if ( $e =~ /^\/([^\/]+)\/$/xsm ) {
+                  my $pat = qr/$1/xsm;
+
+                  if ( $name =~ /$pat/ ) {
+                    return;
+                  }
+                }
+
+                return
+                  if $e eq $name;
+              }
+
+              push @expanded_list, "$File::Find::name $destdir/$name";
             }
-          }
-        },
-        $fqp
-      );
+          },
+          $fqp
+        );
+      };
+
+      chdir $cwd;
+
+      print {*STDERR} Dumper( [ expanded_list => \@expanded_list, error => $EVAL_ERROR ] );
+
       # remove project root since bash script will add it
       for (@expanded_list) {
         s/^$project_root//xsm;
@@ -520,19 +555,24 @@ sub write_file_list {
         if !-e $fqp;
 
       my ( $name, $path, $ext ) = fileparse( $fqp, qr/[.][^.]+/xsm );
-      push @expanded_list, sprintf '%s %s%s%s', $f, $destdir, $name, $ext;
+      push @expanded_list, sprintf '%s %s/%s%s', $f, $destdir, $name, $ext;
     }
   }
 
   return @expanded_list;
 }
 
+# To find files installed to sharedir...
+#
+#  use File::ShareDir;
+#  print File::ShareDir::dist_dir('Bedrock');
+
 # file name or hash
 # extra-files:
-#   share:
+#   - share:
 #     - README.md
 #     - ChangeLog
-#   examples: src/examples
+#   - examples: src/examples
 # extra-files:
 #   - file
 
@@ -558,31 +598,45 @@ sub write_extra_files {
   my @file_list;
 
   foreach my $e ( @{$extra_files} ) {
-    DEBUG Dumper( [$e] );
+    DEBUG Dumper( [ extra => $e ] );
 
-    if ( !ref $e ) {  # simple file
-      push @file_list, $e;
+    if ( !ref $e ) {  # file or directory
+      push @file_list,
+        fetch_file_list(
+        file_list    => [$e],
+        destination  => $EMPTY,
+        project_root => $project_root,
+        );
     }
-    elsif ( is_hash($e) ) {  # possibly dest => dir, or dest => list
-      foreach my $destdir ( keys %{$e} ) {
-        my ($destdir) = keys %{$e};
+    elsif ( is_hash($e) ) {
+      # if the extra-files entry is a hash, then the key of that hash
+      # represents the destination directory.  The value must be an
+      # array of scalars that can be represent individual files within
+      # the project or whole directories within the project.
+      #
+      # DO NOT DO THIS...
+      # extra-files:
+      #   - t: foo.t
+      #
+      # DO THIS INSTEAD...
+      # extra-files:
+      #   - t:
+      #       - foo.t
+      #
+      #
+      my ($destdir) = keys %{$e};
+      my $file_list = $e->{$destdir};
 
-        my $file_list = $e->{$destdir};
+      croak 'directory args for extra-files must be an array!'
+        if !is_array($file_list);
 
-        if ( is_scalar($file_list) ) {
-          $file_list = [$file_list];
-        }
-        elsif ( !is_array($file_list) ) {
-          croak 'extra-files args can only be scalar or list';
-        }
+      push @file_list,
+        fetch_file_list(
+        file_list    => $file_list,
+        destination  => $destdir,
+        project_root => $project_root,
+        );
 
-        push @file_list,
-          write_file_list(
-          file_list    => $file_list,
-          destination  => $destdir,
-          project_root => $project_root,
-          );
-      }
     }
   }
 

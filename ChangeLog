@@ -1,3 +1,18 @@
+Tue Jun 25 15:00:06 2024  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.36]:
+	* VERSION: bump
+	* src/main/bash/bin/make-cpan-dist.in
+	- try harder to find module path
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	(write_file_list)
+	- enamed to fetch_file_list()
+	- added exclude arg
+	- do not recurse subdirectories
+	(write_extra_files)
+	- fetch a file or directory
+	- use fetch_file_list() for hash containing list of scalars
+
 Tue May 21 14:41:46 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.35]:
