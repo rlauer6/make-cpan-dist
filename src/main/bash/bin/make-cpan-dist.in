@@ -106,6 +106,10 @@ function module2path {
 
     root="${PROJECT_HOME}/${perl5libdir}/"
 
+    if ! test -d "$root"; then
+      root="$PROJECT_HOME"
+    fi
+
     for a in $(find $root -name '*.pm'); do
         if grep -q "^package $module;" $a; then
             echo "${a##$root}";
@@ -202,7 +206,7 @@ function get_module_versions {
 	if test -n "$ANY_VERSION"; then
 	    echo "$module 0"
 	elif test -n "$a" && ! test -n "$version"; then
-	    echo $module | @perlenv@ -I ${perl5libdir} \
+	    echo $module | @perlenv@ -I "$perl5libdir" \
             -ne 'chomp; $m=$_; eval "require $m"; $v = eval "\$${m}::VERSION"; print "$m ",$v||0,"\n";' || true;
 	else
 	    echo "$module $version";
@@ -455,7 +459,13 @@ if test -n "$git_project"; then
         autoreconf -i --force && ./configure --with-perlibdir=yes && make
     fi
 elif test -z "$PROJECT_HOME"; then
-    find_git_home
+    if test -n "$GIT"; then
+      if $GIT status >/dev/null 2>/dev/null; then
+          find_git_home
+      else
+          PROJECT_HOME="$(pwd)"
+      fi
+    fi
 fi
 
 if test -z "$PROJECT_HOME"; then
@@ -466,6 +476,7 @@ echo "PROJECT_HOME: $PROJECT_HOME"
 
 # typical directory within project tree containing Perl modules
 perl5libdir=${perl5libdir:-src/main/perl/lib}
+test -d $perl5libdir || perl5libdir="."
 
 # program that will provide the dependency list
 PERL_REQUIRES=${PERL_REQUIRES:-perl_requires}
@@ -491,7 +502,7 @@ if test -n "$EXTRA"; then
             if [ -f "${PROJECT_HOME}/$a" ]; then
                 if test -n "$b"; then
                    dir=$(dirname $b)
-                   test -d $dir || mkdir -p $builddir/$dir
+                   test -d $builddir/$dir || mkdir -p $builddir/$dir
                 fi
                                 
                 cp ${PROJECT_HOME}/$a $builddir/$dir
@@ -519,9 +530,9 @@ fi
 
 all_files=$(mktemp)
 
-test -n "$bindir"&& find ${PROJECT_HOME}/${bindir} $maxdepth -type f -executable > $all_files;
+test -n "$bindir" && test -d "$bindir" && find ${PROJECT_HOME}/${bindir} $maxdepth -type f -executable > $all_files;
 
-test -n "$scriptsdir" && find -L ${PROJECT_HOME}/${scriptsdir} $maxdepth -type f -executable >> $all_files;
+test -n "$scriptsdir" && test -d "$scriptsdir" && find -L ${PROJECT_HOME}/${scriptsdir} $maxdepth -type f -executable >> $all_files;
 
 test -s $all_files && sort -u $all_files > $exe_files
 
@@ -531,14 +542,14 @@ rm $all_files
 # set 'recurse' to 'no' and 'provides' to some value to specify your
 # own set of files to package
 if [ "$recurse_directories" = "yes" ]; then
-    find -L ${PROJECT_HOME}/${perl5libdir} -name '*.pm' > $package_files;
+    find -L ${PROJECT_HOME}/${perl5libdir} -type f -name '*.pm' > $package_files;
 else
     if test -n "$provides"; then
         if test -s "$provides"; then
             echo "$MODULE" >>$provides
 
             for a in $(cat $provides); do
-                echo "${PROJECT_HOME}/${perl5libdir}/$(module2path $a)" >> $package_files
+                test -n "$a" && echo "${PROJECT_HOME}/${perl5libdir}/$(module2path $a)" >> $package_files
             done
         else
             FATAL_ERROR "Empty provides file"
@@ -548,7 +559,7 @@ else
         echo "${PROJECT_HOME}/${perl5libdir}/$module_file" >$package_files
     fi
 fi
-   
+
 for a in $(cat $package_files | sort -u); do
     DEBUG "provides: [$a]"
     
@@ -632,7 +643,7 @@ if test -n "$testsdir"; then
             testsfile=""
         fi
         
-        mkdir ${builddir}/t
+        test -d ${builddir}/t || mkdir ${builddir}/t
         for a in $(cat $testsfile); do
             cp $a ${builddir}/t/
         done

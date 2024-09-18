@@ -137,6 +137,12 @@ I get it - but it's not a holy war.
 
 ## Perl Dependencies
 
+>>UPDATE: The current version of this project uses my
+`scandeps-static.pl` utility to resolve dependencies. this utility is
+distributed with the
+[Module::ScanDeps::Static](https://metacpan.org/pod/Module::ScanDeps::Static)
+Perl module. It is a rewrite of `perl.req` mentioned below.
+
 To use these scripts you'll also need a way to _resolve Perl module
 dependencies_.  The script will use, by default, Red Hat's utility
 that is bundled in its `rpm-build` package (`/usr/lib/rpm/perl.req`).
@@ -278,7 +284,7 @@ control what and how things get packaged.
    ```
 
 * to use a different module dependency checker than the default
-  (`/usr/lib/rpm/perl.req`) set the `resolver` option under the
+  (`scandeps-static.pl`) set the `resolver` option under the
   `dependencies` section. A value of `scandeps` will use `scandeps.pl`
   or set the name of an executable that will simply output
   a list of Perl module names.
@@ -362,9 +368,9 @@ t/
 ...then give this a try:
 
 ```
-/usr/local/bin/make-cpan-dist -m Amazon::Credentials \
+/usr/local/bin/make-cpan-dist -m Foo::Bar \
    -a 'Rob Lauer <rlauer6@comcast.net>' \
-   -d 'AWS credential discoverer' \
+   -d 'the Foo module!' \
    -t t
    -l lib
 ```
@@ -372,9 +378,8 @@ t/
 So far, neither of these methods is particularly hard and can be used
 interchangeably as part of you deployment pipeline.  The key to the
 "easiness" part, at least for me, is the fact that the `bash` script
-will try to resolve dependencies using the helper from the `rpm-build`
-project (`/usr/lib/rpm/perl.req` or the dependency checker you
-specify) and find the Perl module version for each of those
+will try to resolve dependencies using the selected dependency resolver
+and find the Perl module version for each of those
 dependencies.  The __dependency resolver is not perfect__,
 specifically it may get tripped up on some ways your clever Perl
 module utilizes other resources.  In general though, _it's good
@@ -393,11 +398,11 @@ then invoke the Perl script directly by providing all of the necessary
 options.
 
 Provide a file named `requires` that lists the dependencie and their
-versions and a file named `tests-require` if you have tests that
-require additional modules.
+versions and a file named `test-requires` if you have tests that
+require additional modules. For example:
 
 ```
-Amazon::Signature4,1.02
+Amazon::Signature4 1.02
 ```
 
 Of course, at this point you might as well just create your own
@@ -424,6 +429,40 @@ The result of the above operation is the two files (`requires`,
 of the files are then used to populate the template for the
 `Makefile.PL` program generated in the Perl script
 `make-cpan-dist.pl`.
+
+# Advanced Topics
+
+## Where do some of these "extra files" end up?
+
+Files in the `extra-files` section of the `buildspec.yml` file or in
+the `extra-files` file you provided will be installed relative to the
+distribution's share directory.  You can find out where that is
+thusly:
+
+```
+perl -MFile::Sharedir=dist_dir -e 'print dist_dir("Foo"),"\n";'
+```
+
+## How can I add some post installation operations?
+
+[ExtUtils::MakeMaker](https://metacpan.org/pod/ExtUtils::MakeMaker)
+provides the capability to add an additional step to your build or
+installation process by providing a `postamble`
+section. `make-cpan-dist` supports this by allowing you to add a
+section to your `buildspec.yml` file which specifies the name of a
+file containing the extra `make` instructions that will be executed
+after the build and before the installation. A typical postamble file
+might look like this:
+
+```
+ postamble ::
+ 
+ .PHONY: FOO
+ FOO:
+    echo "Thanks for using FOO!"
+
+install:: FOO
+```
 
 # Finally
 
