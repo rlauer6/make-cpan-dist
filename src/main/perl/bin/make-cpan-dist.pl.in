@@ -19,6 +19,7 @@ use File::Basename qw(basename fileparse);
 use File::Find;
 use File::Process qw( process_file filter );
 use File::Temp qw( :POSIX );
+use File::Copy qw(cp);
 use Getopt::Long qw(:config no_ignore_case );
 use JSON qw( encode_json decode_json );
 use List::Util qw( pairs );
@@ -292,7 +293,8 @@ sub write_provides {
   open my $fh, '>', $provides_file
     or croak "could not open 'provides' for writing\n";
 
-  foreach my $file ( @{$provides} ) {
+  foreach my $file ( sort @{$provides} ) {
+    next if !$file;
     print {$fh} "$file\n";
   }
 
@@ -538,8 +540,6 @@ sub fetch_file_list {
       };
 
       chdir $cwd;
-
-      print {*STDERR} Dumper( [ expanded_list => \@expanded_list, error => $EVAL_ERROR ] );
 
       # remove project root since bash script will add it
       for (@expanded_list) {
@@ -1211,6 +1211,13 @@ F<lib> and some tests in a directory named F<t>, you might try:
  make-cpan-dist -l lib -t t -m Foo::Bar \
   -a 'Rob Lauer <rlauer6@comcast.net>' -d 'the Foo::Bar module!'
 
+I<NOTE: Running the Bash script in any directory of your project if it
+is part of a F<git> repository will use the root of the repository as
+your project home directory.  If you are not in a F<git> repository
+AND do not supply the -H option (project home), then the current
+directory will be considered the project home directory. This means
+that options like -l will be relative to the current directory.>
+
 =head2 Using F<buildspec.yml>
 
  make-cpan-dist.pl -b buildspec.yml
@@ -1238,7 +1245,7 @@ Example: -a 'Rob Lauer <rlauer6@comcast.net>'
 
 =item -B, --build-requires
 
-Name of the dependeny file list for building the distribution.
+Name of the dependency file list for building the distribution.
 
 =item -b, --buildspec
 
@@ -1264,6 +1271,10 @@ Name of the module
 
 List of modules to include in distribution
 
+=item --postamble
+
+Name of a file that contains the Makefile postamble section.
+
 =item -R, --require-versions, --no-require-versions
 
 Whether to add version numbers to dependencies.
@@ -1276,7 +1287,7 @@ Name of the dependency file list if other than F<requires>.
 
 =item -s, --scandeps
 
-Use scandeps for dependency checking
+Use F<scandeps.pl> for dependency checking
 
 =item -t, --test-requires
 
@@ -1345,7 +1356,7 @@ The sections are described below:
 
 The path to the C<git> project. When the project is cloned, the
 utility will look for F<configure.ac> and if found will attempt to
-build the project in usual I<autoconfiscated> manner:
+build the project in the usual I<autoconfiscated> manner:
 
  git clone {project}
  autoconf -i --force
@@ -1411,10 +1422,12 @@ module names optionally followed by a version number.
 
  Amazon::Credentials 1.15
 
-By default, the scripts will look for F</usr/lib/rpm/perl.req> as the
+By default, the scripts will look for F<scandeps-static.pl> as the
 dependency resolver, however you can override this by specifying the
 name of program that will produce a list of modules.  If you specify
 the special name I<scandeps>, the scripts will use F<scandeps.pl>.
+
+NOTE: F<scandeps-static.pl> is provided by L<Module::ScanDeps::Static>
 
 =over 15
 

@@ -1,0 +1,25 @@
+#!/bin/bash
+# -*- mode: sh; -*-
+
+# - build script for GitHub actions
+
+set -ex
+apt-get install -y git automake
+cpanm -n -v \
+  JSON \
+  JSON::PP \
+  File::Process \
+  YAML::Tiny \
+  Log::Log4perl \
+  Module::ScanDeps::Static
+./bootstrap
+./configure --with-perl5libdir=$(perl -MConfig -wle 'print $Config{sitelib};')
+make && make install
+cd cpan
+mkdir t
+mkdir -p lib/File
+cp ../src/main/perl/lib/t/* t/
+cp -r ../src/main/perl/lib/File/* lib/File/
+make cpan
+cpanm -v $(ls -1 *.tar.gz | head -1)
+perl -MFile::Process -e 'print $File::Process::VERSION;'

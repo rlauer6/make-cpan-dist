@@ -1,3 +1,25 @@
+Wed Sep 18 14:27:20 2024  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.37]:
+	* VERSION: bump
+	* build: new
+	* .github/workflows/build.yml: move steps to build
+	* src/main/bash/bin/make-cpan-dist.in
+	- only traverse git projects backwards looking for project home
+	- set perl5libdir to '.' if not an autoconfiscated project
+	- bug when checking/making directories
+	- only look in directories for executables
+	- only look for files when recursing directories
+	- test provides for blanks
+	- don't create t directory if exists
+	(module2path)
+	- use project home if not an autoconfiscated perl repo
+	(get_module_versions)
+	- quote $perl5libdir
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- pod tweaks, additions
+	* src/main/perl/lib/CPAN/Maker/Utils.pm.in: whitespace
+
 Tue Jun 25 15:00:06 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.36]:
