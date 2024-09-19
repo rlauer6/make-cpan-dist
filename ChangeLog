@@ -1,3 +1,10 @@
+Thu Sep 19 16:16:25 2024  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.38]:
+	* VERSION: bump
+	* src/main/bash/bin/make-cpan-dist.in
+	- needed $PROJEC_HOME prefix when checking for bin/scripts directories
+
 Wed Sep 18 14:27:20 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.37]:

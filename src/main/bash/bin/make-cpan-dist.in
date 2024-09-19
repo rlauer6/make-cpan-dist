@@ -530,9 +530,9 @@ fi
 
 all_files=$(mktemp)
 
-test -n "$bindir" && test -d "$bindir" && find ${PROJECT_HOME}/${bindir} $maxdepth -type f -executable > $all_files;
+test -n "$bindir" && test -d "${PROJECT_HOME}/$bindir" && find ${PROJECT_HOME}/${bindir} $maxdepth -type f -executable > $all_files;
 
-test -n "$scriptsdir" && test -d "$scriptsdir" && find -L ${PROJECT_HOME}/${scriptsdir} $maxdepth -type f -executable >> $all_files;
+test -n "$scriptsdir" && test -d "${PROJECT_HOME}/$scriptsdir" && find -L ${PROJECT_HOME}/${scriptsdir} $maxdepth -type f -executable >> $all_files;
 
 test -s $all_files && sort -u $all_files > $exe_files
 
