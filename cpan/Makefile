@@ -2,7 +2,7 @@ MAKE_CPAN_DIST = make-cpan-dist.pl
 
 DISTRIBUTION = File-Process
 
-goals = t lib/File cpan
+goals = t lib/File/Process.pm cpan
 
 .phony: upload
 
@@ -10,10 +10,14 @@ all: $(goals)
 	$(MAKE) $(filter t, lib/File, $(goals))
 	$(MAKE) cpan
 
-lib/File:
-	test -d lib || mkdir lib; \
-	cd lib; \
-	ln -sf ../../src/main/perl/lib/File File
+lib/File/Process.pm:
+	test -d lib/File || mkdir -p lib/File; \
+	if ! test -e ../src/main/perl/lib/File/Process.pm; then \
+	   cd ..; \
+	  $(MAKE); \
+	  cd -; \
+	fi; \
+	cp  ../src/main/perl/lib/File/Process.pm lib/File/Process.pm
 
 t:
 	test -d t || ln -sf ../src/main/perl/lib/t
@@ -24,7 +28,7 @@ export VERSION = $(shell perl -I lib -MFile::Process -e 'print "$$File::Process:
 
 TARBALL = File-Process-$(VERSION).tar.gz
 
-cpan: $(TARBALL)
+cpan: $(TARBALL) lib/File/Process.pm
 	echo $(TARBALL)
 
 BUILDSPEC = buildspec.yml

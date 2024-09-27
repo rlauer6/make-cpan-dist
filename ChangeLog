@@ -1,3 +1,20 @@
+Fri Sep 27 15:03:00 2024  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.39]:
+	* VERSION: bump
+	* build: remove JSON::PP
+	* configure.ac: likewise, add Pod::Checker
+	* cpan/Makefile
+	- lib/File/Process.pm should be target
+	- don't use symlink
+	- re-Make if Process.pm not found
+	* src/main/bash/bin/make-cpan-dist.in
+	- test for $module_file first
+	* src/main/perl/lib/File/Process.pm.in
+	- bump version
+	- use JSON, not JSON::PP
+	* src/main/perl/lib/t/02-process.t: likewise
+
 Thu Sep 19 16:16:25 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.38]:

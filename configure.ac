@@ -132,12 +132,12 @@ fi
 
 ads_PERL_MODULE([ReadonlyX], [], [1.04])
 ads_PERL_MODULE([File::Process], [], [0.07])
-ads_PERL_MODULE([JSON::PP], [], [4.10])
 ads_PERL_MODULE([JSON], [], [4.10])
 ads_PERL_MODULE([IO::Pager], [OPTIONAL])
 ads_PERL_MODULE([Log::Log4perl], [], [1.55])
 ads_PERL_MODULE([Log::Log4perl::Level])
 ads_PERL_MODULE([YAML::Tiny], [], [1.73])
+ads_PERL_MODULE([Pod::Checker], [], [])
 
 perl5libdir=\${datadir}/perl5
 AC_ARG_WITH(

@@ -12,7 +12,7 @@ use Data::Dumper;
 
 use parent qw( Exporter );
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 our %DEFAULT_PROCESSORS = (
   pre       => \&_pre,
@@ -259,10 +259,10 @@ sub main {
 ########################################################################
   require IO::Scalar;
   require Data::Dumper;
-  require JSON::PP;
+  require JSON;
   require Text::CSV_XS;
 
-  JSON::PP->import('decode_json');
+  JSON->import('decode_json');
 
   Data::Dumper->import('Dumper');
 

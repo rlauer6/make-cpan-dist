@@ -7,7 +7,6 @@ set -ex
 apt-get install -y git automake
 cpanm -n -v \
   JSON \
-  JSON::PP \
   File::Process \
   YAML::Tiny \
   Log::Log4perl \

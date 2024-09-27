@@ -486,8 +486,7 @@ builddir=$(mktemp -d)
 trap cleanup EXIT
 
 module_file="$(module2path $MODULE)"
-
-mkdir -p ${builddir}/lib/$(dirname $module_file);
+test -n "$module_file" && mkdir -p ${builddir}/lib/$(dirname $module_file);
 
 if ! test -e "${PROJECT_HOME}/${perl5libdir}/$module_file"; then
     FATAL_ERROR "no "${PROJECT_HOME}/${perl5libdir}/$module_file" found!"
