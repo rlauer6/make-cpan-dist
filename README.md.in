@@ -5,29 +5,7 @@
 This project is yet another attempt to create a repeatable, __easy to
 use__ script for creating CPAN distributions.
 
-# Table of Contents
-
-* [README](#readme)
-* [Overview](#overview)
-* [Quick Start](#quick-start)
-  * [Build and Install](#build-and-install)
-* [More Details](#more-details)
-* [Perl Dependencies](#perl-dependencies)
-* [What Next?](#what-next)
-* [Creating a CPAN Distribution](#creating-a-cpan-distribution)
-  * [The Easy Way](#the-easy-way)
-    * [Additional Build Specification Options](#additional-build-specification-options)
-  * [The Harder Way](#the-harder-way)
-  * [The Hardest Way](#the-hardest-way)
-* [FAQ](#faq)
-  * [Why is this easier than just building a `Makefile.PL` by using `ExtUtils::MakeMaker`?](#why-is-this-easier-than-just-building-a-makefilepl-by-using-extutilsmakemaker)
-  * [Why is there a bash script AND a Perl script](#why-is-there-a-bash-script-and-a-perl-script)
-  * [Why did you _autoconfiscate_ a project that has just 1 Perl script and 1 bash script](#why-did-you-autoconfiscate-a-project-that-has-just-1-perl-script-and-1-bash-script)
-  * [Where do files in the `extra_files` section end up?](#where-do-files-in-the-extrafiles-section-end-up)
-  * [How can I add some post installation operations?](#how-can-i-add-some-post-installation-operations)
-* [Module Versions](#module-versions)
-* [Finally](#finally)
-* [Author](#author)
+@TOC@
 
 # Overview
 
@@ -49,7 +27,7 @@ make-cpan-dist.pl -h
 perldoc CPAN::Maker
 ```
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 # Quick Start
 
@@ -79,7 +57,7 @@ cd make-cpan-dist
 
 If you want to do this in pieces take a look at the [build script](build).
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## Build and Install
 
@@ -98,7 +76,7 @@ make & sudo make install
 make && make install
 ```
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 # More Details
 
@@ -189,7 +167,7 @@ make-cpan-dist -a 'Rob Lauer <rlauer6@comcast.net>' \
    -r dep_resolver
 ```
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 # What Next?
 
@@ -207,7 +185,7 @@ When using a buildspec file you need only be concerned with
 make-cpan-dist.pl -b buildspec.yml
 ```
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 # Creating a CPAN Distribution
 
@@ -219,7 +197,7 @@ _simplest_ thing you can do is run the utility against a
 `buildspec.yml` file that describes the distribution you would like to
 create.
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## The Easy Way
 
@@ -273,7 +251,7 @@ make-cpan-dist.pl -b buildspec.yml
 After executing that statement, you should have a tar ball in your
 current working directory.
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ### Additional Build Specification Options
 
@@ -338,7 +316,7 @@ control what and how things get packaged.
   $PERL_VERSION (the version of perl in your environment) which may
   not be the same version as your target deployment environment!
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## The Harder Way
 
@@ -406,7 +384,7 @@ enough_.  You you can always ask the script to preserve (`-p`) the
 could also open an issue and I'll try to tackle it. You could also
 make a pull request. ;-)
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## The Hardest Way
 
@@ -446,7 +424,7 @@ The result of the above operation is a set of files:
 These files are eventually used by the `make-cpan-dist.pl` script to
 create your final `Makefile.PL`.
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 # FAQ
 
@@ -526,7 +504,7 @@ By creating a `Makefile` recipe, whenever I update the buildspec or
 any of the modules or scripts and run `make`, I'll automatically
 create a new distribution.
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## Why is there a bash script AND a Perl script
 
@@ -546,7 +524,7 @@ the beginning I think I created a bash script that did all of the
 heavy lifting but later found I needed a more powerful environment for
 enhancing the script.
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## Why did you _autoconfiscate_ a project that has just 1 Perl script and 1 bash script
 
@@ -589,7 +567,7 @@ simpler when you can rely on some degree of portability and
 standardization of your toolchain. Many disagree and hate `autoconf` -
 I get it - but it's not a holy war.
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## Where do files in the `extra_files` section end up?
 
@@ -613,7 +591,7 @@ below.
 perl -MFile::ShareDir=dist_dir -e 'print dist_dir("Foo"),"\n";'
 ```
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 ## How can I add some post installation operations?
 
@@ -636,7 +614,7 @@ might look like this:
 install:: FOO
 ```
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 # Module Versions
 
@@ -669,7 +647,7 @@ require Foo:Bar::VERSION;
 make-cpan-dist -l lib -t t -S bin -m Foo::Bar -V Foo::Bar::VERSION
 ```
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@
 
 # Finally
 
@@ -680,4 +658,4 @@ know.
 
 Rob Lauer <rlauer6@comcast.net>
 
-[Back to Table of Contents](#table-of-contents)
+@TOC_BACK@

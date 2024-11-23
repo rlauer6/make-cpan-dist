@@ -43,6 +43,7 @@ $(GPERLSCRIPTS): % : %.in
 	test -d "$$(dirname "$@")" || $(INSTALL) -d "$$(dirname "$@")"
 	$(do_subst) $< > $@
 	$(perlwc) $(PERLINCLUDE) -wc $@ || { rm $@ && exit 1; }
+	test -e $@ && chmod +x $@
 
 all:
 
@@ -55,7 +56,7 @@ $(G1MANPAGES): %.1man : %.pl
 	--center="$(PACKAGE)" \
 	--name="$${tname}" \
 	--release=$(PACKAGE)-$(VERSION) \
-	--section=1man > "$${target_name}"
+	--section=1man > "$${target_name}" || true
 
 .PHONY: clean-local
 clean-local:

@@ -20,5 +20,6 @@ dist_noinst_DATA = $(BASHSCRIPTS)
 
 $(GBASHSCRIPTS): % : %.in
 	$(do_subst) $< > $@
+	chmod +x $@
 
 CLEANFILES = $(GBASHSCRIPTS)

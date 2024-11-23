@@ -1,5 +1,6 @@
-!Makefile
 t
 provides
+extra-files
+resources
 lib/**
-File-Process*
+CPAN-Maker-*

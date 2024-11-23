@@ -1,3 +1,77 @@
+Sun Nov 24 07:41:58 2024  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.40]:
+	* VERSION: bump
+	* bootstrap: command, not which
+	* README.md: generated
+	* README.md.in
+	- new from README.md
+	- TOC
+	- tweaks & updates
+	* Makefile.am
+	- build README.md from README.md.in
+	* build
+	- added some module dependencies
+	- use buildspec to build cpan distribution
+	- install Perl module dependencies from requires files
+	- install packages for debian, redhat
+	* configure.ac
+	- add cpan/Makefile to build
+	- removed File::Proces from list of required modules
+	- add Pod::Find, removed Log::Log4perl::Level
+	- add Text::CSV_XS
+	- add Markdown::Render
+	* cpan/.gitignore
+	- moved !Makefile
+	- + CPAN-Maker*
+	- removed File-Process*
+	* cpan/Makefile.am: replaced Makefile w/better cpan maker
+	* cpan/build-requires: new
+	* cpan/buildspec.yml
+	- add all files/modules not just File::Process
+	- add ChangeLog, README.md to distribution share directory
+	- add build-requires
+	* cpan/requires
+	- JSON, not JSON::PP
+	- +YAML::Tiny
+	- Log::Log4perl
+	- Text::CSV_XS
+	- Pod::Find
+	* cpan/test-requires: no version for Text::CSV_XS
+	* src/main/bash/bin/Makefile.am
+	- chmod +x
+	- don't exit if pod2man fails
+	* src/main/bash/bin/make-cpan-dist.in
+	- support for -S, -e as path or file
+	- find make-cpan-dist.pl instead of using @libexecdir@
+	- maybe no executable files?
+	- + -V (version from) option
+	- provide default description
+	* src/main/perl/bin/make-cpan-dist.pl.in
+	- likewise
+	- --no-pager, not --nopager
+	- move pod to CPAN::Maker
+	(parse_path): check paths
+	(check_path): new
+	(parse_buildspec)
+	- support scripts, exe_files
+	- support - or _ for min-perl-version, include-version
+	(create_executables_file): new
+	(main)
+	- uncommented min-perl-version?
+	- add --version-from option
+	(get_yaml_specfile): end on eof or =pod
+	(write_makefile)
+	- use new option 'version_from'
+	(get_buildspec):
+	- allow include-version or include_version
+	- allow min-perl-version or min_perl_version
+	* src/main/perl/lib/Makefile.am
+	- build README.md
+	- chmod +x
+	- added CPAN/Maker.pm to build
+	* src/main/perl/lib/README.md: new
+
 Fri Sep 27 15:03:00 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.39]:

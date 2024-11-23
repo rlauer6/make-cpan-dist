@@ -18,16 +18,22 @@ FILE_PROCESS_PERLMODULES = \
     File/Process/Utils.pm.in
 
 CPAN_PERLMODULES = \
+    CPAN/Maker.pm.in
+
+CPAN_MAKER_PERLMODULES = \
     CPAN/Maker/Utils.pm.in \
     CPAN/Maker/Constants.pm.in
 
 PERLMODULES = \
     $(FILE_PERLMODULES) \
     $(FILE_PROCESS_PERLMODULES) \
-    $(CPAN_PERLMODULES)
+    $(CPAN_PERLMODULES) \
+    $(CPAN_MAKER_PERLMODULES)
 
 GFILE_PERLMODULES         = $(FILE_PERLMODULES:.pm.in=.pm)
 GFILE_PROCESS_PERLMODULES = $(FILE_PROCESS_PERLMODULES:.pm.in=.pm)
+
+GCPAN_MAKER_PERLMODULES   = $(CPAN_MAKER_PERLMODULES:.pm.in=.pm)
 GCPAN_PERLMODULES         = $(CPAN_PERLMODULES:.pm.in=.pm)
 GPERLMODULES              = $(PERLMODULES:.pm.in=.pm)
 
@@ -39,13 +45,17 @@ file_DATA = $(GFILE_PERLMODULES)
 file_processdir = $(perl5libdir)/File/Process
 file_process_DATA = $(GFILE_PROCESS_PERLMODULES)
 
+cpandir = $(perl5libdir)/CPAN
+cpan_DATA = $(GCPAN_PERLMODULES)
+
 cpan_makerdir = $(perl5libdir)/CPAN/Maker
-cpan_maker_DATA = $(GCPAN_PERLMODULES)
+cpan_maker_DATA = $(GCPAN_MAKER_PERLMODULES)
 
 dist_noinst_DATA = \
     $(FILE_PERLMODULES) \
     $(FILE_PROCESS_PERLMODULES) \
-    $(CPAN_PERLMODULES)
+    $(CPAN_PERLMODULES) \
+    $(CPAN_MAKER_PERLMODULES)
 
 man3_MANS = $(G3MANPAGES)
 
@@ -75,6 +85,8 @@ CPAN/Maker/Utils.pm: CPAN/Maker/Utils.pm.in CPAN/Maker/Constants.pm
 	$(do_subst) $< > $@
 	$(perlwc) $(PERLINCLUDE) -wc $@ || { rm $@ && exit 1; }
 
+all: $(GPERLMODULES) $(G3MANPAGES) README.md
+
 CLEANFILES = $(GPERLMODULES)
 
 $(G3MANPAGES): %.3man : %.pm
@@ -103,6 +115,9 @@ clean-generated-man-pages:
 	done
 
 manpages: $(G3MANPAGES)
+
+README.md: CPAN/Maker.pm
+	pod2markdown $< > $@
 
 AUTOMAKE_OPTIONS = no-installman
 

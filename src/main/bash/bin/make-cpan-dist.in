@@ -40,6 +40,7 @@ Options
 -R yes/no       - recurse directories for files to package (default: yes)
 -t path         - path to test files
 -v              - more verbose output
+-V              - version from module
 -x              - do not cleanup files
 -y              - name of a file containing PL_FILES entries
 
@@ -246,6 +247,29 @@ function scan() {
     fi
 }
 
+########################################################################
+function executables() {
+########################################################################
+    executables="$1";
+    filelist="$2";
+
+    if test -n "$filelist" && test -n "$executables"; then
+        if test -d "${PROJECT_HOME}/$executables"; then
+            find -L ${PROJECT_HOME}/${executables} $maxdepth -type f -executable >> $filelist;
+        else
+            if test -f "$executables"; then
+                cat $executables >> $filelist;
+                if  [[ "$executables" =~ executables-[A-Za-z]{5} ]]; then
+                    rm $executables
+                fi
+            else
+                echo "no such file $executables"
+                exit 1
+            fi
+        fi
+    fi
+}
+
 # +--------------------+
 # | SCRIPT STARTS HERE |
 # +--------------------+
@@ -256,8 +280,9 @@ PERLTIDY=$(command -v perltidy);
 
 # required
 PERL=$(command -v perl);
+MAKE_CPAN_DIST=$(command -v make-cpan-dist.pl)
 
-while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:" arg "$@"; do
+while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@"; do
 
     case "${arg}" in
 
@@ -378,6 +403,11 @@ while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:" arg "$@";
             VERBOSE="1";
             ;;
 
+        V)
+            VERSION_FROM="$OPTARG";
+            shift;
+            ;;
+
         x)
             NOCLEANUP="1";
             ;;
@@ -414,13 +444,13 @@ fi
 shift $((OPTIND -1))
 
 if test -n "$BUILDSPEC"; then
-    PROJECT_HOME="$PROJECT_HOME" @libexecdir@/make-cpan-dist.pl \
+    PROJECT_HOME="$PROJECT_HOME" $MAKE_CPAN_DIST
                 -b $BUILDSPEC $DRYRUN
     exit $?;
 fi
 
 test -z "$MODULE" && usage "no module specified";
-test -z "$description" && usage "no description";
+test -z "$description" && description="The $MODULE module!";
 
 if test -z "$author"; then
     if test -n "$GIT"; then
@@ -519,9 +549,8 @@ package_files=$(mktemp)
 
 ########################################################################
 # gather executables - files must be executable if they are going to be packaged
-########################################################################
+###################0#####################################################
 exe_files=$(mktemp)
-scripts=$(mktemp)
 
 if [ ! "$recurse_directories" = "yes" ]; then
     maxdepth='-maxdepth 1'
@@ -529,13 +558,13 @@ fi
 
 all_files=$(mktemp)
 
-test -n "$bindir" && test -d "${PROJECT_HOME}/$bindir" && find ${PROJECT_HOME}/${bindir} $maxdepth -type f -executable > $all_files;
+executables $bindir $all_files
 
-test -n "$scriptsdir" && test -d "${PROJECT_HOME}/$scriptsdir" && find -L ${PROJECT_HOME}/${scriptsdir} $maxdepth -type f -executable >> $all_files;
+executables $scriptsdir $all_files
 
 test -s $all_files && sort -u $all_files > $exe_files
 
-rm $all_files
+test -n $NOCLEANUP || rm $all_files
 ########################################################################
 
 # set 'recurse' to 'no' and 'provides' to some value to specify your
@@ -696,12 +725,15 @@ if test -n "$POSTAMBLE"; then
 fi
 
 # create the Makefile.PL
-if ! PROJECT_HOME=$PROJECT_HOME @libexecdir@/make-cpan-dist.pl \
+export PROJECT_HOME=$PROJECT_HOME
+test -n "$VERSION_FROM" && VERSION_FROM="--version-from $VERSION_FROM"
+
+if ! PROJECT_HOME=$PROJECT_HOME $MAKE_CPAN_DIST \
             $CORE_MODULES $BUILD_REQUIRES -r ${workdir}/requires \
             -e $exe_files $TESTREQUIRES  $min_perl_version \
             -w ${builddir} $EXTRA_OPTIONS \
             -l $LOG_LEVEL $PL_FILE_OPTS $REQUIRE_VERSION \
-            -m "$MODULE" \
+            -m "$MODULE" $VERSION_FROM \
             -A "$description" \
             -a "$author" > $builddir/Makefile.PL; then
     ERROR "could not successfully create Makefile.PL"

@@ -1,3 +1,2 @@
-JSON::PP 4.10
-Text::CSV_XS 1.48
-List::Util 1.33
+JSON 0
+Text::CSV_XS 0

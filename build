@@ -1,24 +1,48 @@
 #!/bin/bash
 # -*- mode: sh; -*-
+#  build script for GitHub actions
 
-# - build script for GitHub actions
+YUM=$(command -v yum)
+APT=$(command -v apt-get)
+DNF=$(command -v dnf)
+CPANM=$(command -v cpanm)
 
 set -ex
-apt-get install -y git automake
-cpanm -n -v \
-  JSON \
-  File::Process \
-  YAML::Tiny \
-  Log::Log4perl \
-  Module::ScanDeps::Static
+
+if test -n "$APT"; then
+    apt-get install -y git gcc make automake curl autoconf
+elif test -n "$DNF"; then
+    dnf install -y --allowerasing gcc git curl automake make autoconf perl-core tar
+elif test -n "$YUM"; then
+    yum install -y gcc git curl automake make autoconf perl-core tar
+fi
+
+if test -z "$CPANM"; then
+  curl -L https://cpanmin.us | perl - App::cpanminus
+fi
+
+# Perl module dependencies
+for a in $(cat cpan/*requires | perl -ne 'chomp; ($a,$b)=split/\s+/; printf "%s%s\n", $a, $b ne "0" ? "\@$b" : "";'); do \
+    cpanm -n -v $a; \
+done
+
 ./bootstrap
-./configure --with-perl5libdir=$(perl -MConfig -wle 'print $Config{sitelib};')
-make && make install
+./configure --prefix=/usr/local --with-perl5libdir
+
+if make; then
+    make install
+else
+    echo "ERROR: make failed"
+    false
+fi
+
 cd cpan
-mkdir t
-mkdir -p lib/File
-cp ../src/main/perl/lib/t/* t/
-cp -r ../src/main/perl/lib/File/* lib/File/
-make cpan
-cpanm -v $(ls -1 *.tar.gz | head -1)
-perl -MFile::Process -e 'print $File::Process::VERSION;'
+PATH=/usr/local/bin:$PATH make cpan
+if test -e CPAN-Maker-*.tar.gz; then
+    cpanm -n -v CPAN-Maker-*.tar.gz
+    perl -MFile::Process -e 'print $File::Process::VERSION;'
+    perl -MCPAN::Maker -e 'print $CPAN::Maker::VERSION;'
+else
+    echo "ERROR: make cpan failed"
+    false
+fi

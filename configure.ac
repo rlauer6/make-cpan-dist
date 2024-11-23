@@ -6,7 +6,7 @@ if test -z "$VERSION"; then \
 fi; \
 echo $VERSION
 ]),
-        m4_esyscmd_s([if test -z "$EMAIL"; then EMAIL=rclauer@gmail,com; fi; echo $EMAIL]),[make-cpan-dist])
+        m4_esyscmd_s([if test -z "$EMAIL"; then EMAIL=bigfoot@cpan.org; fi; echo $EMAIL]),[make-cpan-dist])
 
 __poor_mans_expand_file_name () {
     _tmp_name=$1
@@ -116,6 +116,13 @@ if test -z "$SCANDEPS" ; then
   AC_MSG_WARN([scandeps.pl not found?])
 fi
 
+AC_PATH_PROG([MDUTILS],
+	[md-utils.pl])
+
+if test -z "$MDUTILS" ; then 
+  AC_MSG_ERROR([md-utils.pl not found?])
+fi
+
 AC_PATH_PROG([POD2MAN],
 	[pod2man])
 
@@ -131,13 +138,14 @@ if test -z "$PERL" ; then
 fi
 
 ads_PERL_MODULE([ReadonlyX], [], [1.04])
-ads_PERL_MODULE([File::Process], [], [0.07])
 ads_PERL_MODULE([JSON], [], [4.10])
 ads_PERL_MODULE([IO::Pager], [OPTIONAL])
 ads_PERL_MODULE([Log::Log4perl], [], [1.55])
-ads_PERL_MODULE([Log::Log4perl::Level])
 ads_PERL_MODULE([YAML::Tiny], [], [1.73])
+ads_PERL_MODULE([Text::CSV_XS], [], [])
 ads_PERL_MODULE([Pod::Checker], [], [])
+ads_PERL_MODULE([Pod::Find], [], [])
+ads_PERL_MODULE([Markdown::Render], [], 1.60.1])
 
 perl5libdir=\${datadir}/perl5
 AC_ARG_WITH(
@@ -174,6 +182,7 @@ AC_CONFIG_FILES([
     src/main/perl/lib/Makefile
     src/main/bash/Makefile
     src/main/bash/bin/Makefile
+    cpan/Makefile
 ])
 
 AC_OUTPUT
