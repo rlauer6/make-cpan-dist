@@ -41,6 +41,5 @@ clean-local:
 	done
 	rm -f *.tar.gz
 	rm -f *.tmp
-	if test -n "$$(ls -d CPAN-Maker-*)"; then \
-	  rm -rf "$$(ls -d CPAN-Maker-*)"; \
-	fi
+	find . -maxdepth 1 -name 'CPAN-Maker*' -type d -exec rm -rf {} \;
+

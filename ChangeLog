@@ -25,7 +25,9 @@ Sun Nov 24 07:41:58 2024  Rob Lauer  <rlauer6@comcast.net>
 	- moved !Makefile
 	- + CPAN-Maker*
 	- removed File-Process*
-	* cpan/Makefile.am: replaced Makefile w/better cpan maker
+	* cpan/Makefile.am
+	- replaced Makefile w/better cpan maker
+	- cleanup directories w/find
 	* cpan/build-requires: new
 	* cpan/buildspec.yml
 	- add all files/modules not just File::Process
@@ -42,11 +44,18 @@ Sun Nov 24 07:41:58 2024  Rob Lauer  <rlauer6@comcast.net>
 	- chmod +x
 	- don't exit if pod2man fails
 	* src/main/bash/bin/make-cpan-dist.in
+	- organize options
+	- new options -O, -C
 	- support for -S, -e as path or file
 	- find make-cpan-dist.pl instead of using @libexecdir@
 	- maybe no executable files?
 	- + -V (version from) option
 	- provide default description
+	- EXTRA_PATH, EXEC_PATH, SCRIPTS_PATH, TESTS_PATH, PATH_SPEC for creating buildspec
+	- create a default resources file
+	- PL_FILES is now a file list
+	(cleanup): remove resources temp file
+	(executables): don't remove files
 	* src/main/perl/bin/make-cpan-dist.pl.in
 	- likewise
 	- --no-pager, not --nopager
@@ -55,17 +64,30 @@ Sun Nov 24 07:41:58 2024  Rob Lauer  <rlauer6@comcast.net>
 	(check_path): new
 	(parse_buildspec)
 	- support scripts, exe_files
-	- support - or _ for min-perl-version, include-version
-	(create_executables_file): new
+	- support - or _ for min-perl-version, include-version, version-from
+	(create_temp_filelist): new
 	(main)
+	- organize options
 	- uncommented min-perl-version?
 	- add --version-from option
+	- don't add paths to executables, rely on $PATH
+	- add version-from to buildfile specification
 	(get_yaml_specfile): end on eof or =pod
 	(write_makefile)
+	- use uppercase names for values in Makefile.PL
 	- use new option 'version_from'
+	- create buildspec file
+	(write_buildspec_file): new
 	(get_buildspec):
 	- allow include-version or include_version
 	- allow min-perl-version or min_perl_version
+	(write_resources): pretty json
+	(write_pl_files)
+	- create temp file
+	(fetch_relative_filelist): new
+	(slurp_file): new
+	* src/main/perl/lib/CPAN/Maker.pm.in
+	- pod tweaks
 	* src/main/perl/lib/Makefile.am
 	- build README.md
 	- chmod +x

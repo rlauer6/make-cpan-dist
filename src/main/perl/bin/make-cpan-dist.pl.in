@@ -218,7 +218,7 @@ sub write_resources {
     open my $fh, '>', $resources_file
       or croak "could not open resources for writing\n";
 
-    print {$fh} encode_json($resources);
+    print {$fh} JSON->new->pretty->encode($resources);
 
     close $fh
       or croak "could not close file $resources_file\n";
@@ -235,14 +235,15 @@ sub write_pl_files {
   return %args
     if !$pl_files;
 
-  open my $fh, '>', 'pl_files'
-    or die "could not open pl_files for writing\n";
+  my ( $fh, $filename ) = tempfile( 'make-cpan-dist-XXXXX', TMPDIR => $TRUE );
 
-  print {$fh} join qq{--pl-files "$_" }, @{$pl_files};
+  print {$fh} join $SPACE, %{$pl_files};
 
   close $fh;
 
-  return;
+  $args{y} = $filename;
+
+  return %args;
 }
 
 ########################################################################
@@ -277,11 +278,39 @@ sub write_makefile {
   my (%options) = @_;
 
   my $core            = $options{'core-modules'};
-  my $module_abstract = $options{'abstract'};
-  my $author          = $options{'author'};
+  my $MODULE_ABSTRACT = $options{abstract};
+  my $AUTHOR          = $options{author};
+  my $project_root    = $options{'project-root'};
 
-  my $version_from = $options{'version-from'} || $options{'module'};
-  $version_from = 'lib/' . make_path_from_module($version_from);
+  my $email;
+  my $author;
+
+  if ( $AUTHOR && $AUTHOR =~ /^([^<]+)\s+<([^>]+)>\s*$/xsm ) {
+    $author = $1;
+    $email  = $2;
+  }
+
+  my $PM_MODULE = $options{module};
+
+  my %buildspec = (
+    version => $VERSION,
+    project => {
+      description => $MODULE_ABSTRACT,
+      author      => {
+        name   => $AUTHOR // 'Anonymouse',
+        mailto => $email  // 'anonymouse@example.org',
+      },
+    },
+    pm_module => $PM_MODULE,
+  );
+
+  my $VERSION_FROM = $options{'version-from'} // $options{module};
+
+  if ( $VERSION_FROM !~ /\//xsm ) {
+    $VERSION_FROM = 'lib/' . make_path_from_module($VERSION_FROM);
+  }
+
+  $buildspec{'version-from'} = $VERSION_FROM;
 
   local $Data::Dumper::Terse    = $TRUE;
   local $Data::Dumper::Sortkeys = $TRUE;
@@ -293,21 +322,33 @@ sub write_makefile {
     $options{$d} = $options{$d} || $d;
   }
 
-  my $pre_req = Dumper get_requires( $options{'requires'}, $core, $options{'min-perl-version'} );
-  $pre_req = trim($pre_req);
-  $pre_req =~ s/([@]\d+)/== $2/xsmg;
+  $buildspec{dependencies} = {
+    $options{requires}       ? ( requires       => $options{requires} )         : (),
+    $options{test_requires}  ? ( test_requires  => $options{'test-requires'} )  : (),
+    $options{build_requires} ? ( build_requires => $options{'build-requires'} ) : (),
+  };
 
-  my $test_req = {};
+  foreach (qw(requires test_requires build_requires)) {
+    next if !$buildspec{dependencies}->{$_};
+
+    $buildspec{dependencies}->{$_} =~ s/$project_root\/?//xsm;
+  }
+
+  my $PRE_REQ = Dumper get_requires( $options{'requires'}, $core, $options{'min-perl-version'} );
+  $PRE_REQ = trim($PRE_REQ);
+  $PRE_REQ =~ s/([@]\d+)/== $2/xsmg;
+
+  my $TEST_REQ = {};
 
   if ( $options{'test-requires'} && -s $options{'test-requires'} ) {
-    $test_req = Dumper get_requires( $options{'test-requires'}, $core, $options{'min-perl-version'} );
+    $TEST_REQ = Dumper get_requires( $options{'test-requires'}, $core, $options{'min-perl-version'} );
   }
   else {
-    $test_req = '{}';
+    $TEST_REQ = '{}';
   }
 
-  $test_req = trim($test_req);
-  $test_req =~ s/\@(\d+)/== $1/xsmg;
+  $TEST_REQ = trim($TEST_REQ);
+  $TEST_REQ =~ s/\@(\d+)/== $1/xsmg;
 
   my $build_req = {};
 
@@ -322,23 +363,56 @@ sub write_makefile {
   $build_req = Dumper $build_req;
 
   my @exe_file_list;
+  $buildspec{path} = {
+    pm_module => $options{'module-path'},
+    recurse   => $options{recurse} ? 'yes' : 'no',
+  };
 
-  if ( $options{'exe-files'} && -s $options{'exe-files'} ) {
-    @exe_file_list = get_exe_file_list( $options{'exe-files'} );
+  my $exe_files = $options{'exe-files'} || $options{'exec-path'};
+
+  if ( $exe_files && -s $exe_files ) {
+    @exe_file_list = get_exe_file_list($exe_files);
+    $options{'exec-path'} = $exe_files;
   }
 
-  my $exe_files = Dumper \@exe_file_list;
+  foreach my $p ( pairs qw(exe-files exec-path scripts scripts-path tests tests-path) ) {
+    next
+      if !$options{ $p->[1] };
+
+    my $project_file = sprintf '%s/%s', $project_root, $options{ $p->[1] };
+
+    if ( -e $project_file ) {
+      $buildspec{path}->{ $p->[0] } = $options{ $p->[1] };
+    }
+    else {
+      $buildspec{ $p->[0] } = fetch_relative_filelist( $project_root, $options{ $p->[1] } );
+
+      # remove temporary files?
+      if ( $options{ $p->[1] } =~ /make\-cpan\-dist\-[[:alpha:]]{5}/xsm ) {
+        unlink $options{ $p->[1] };
+      }
+    }
+  }
+
+  if ( $options{'extra-path'} ) {
+    $buildspec{'extra-files'} = $options{'extra-path'};
+  }
+
+  my $EXE_FILES = Dumper \@exe_file_list;
 
   my %provides;
 
   if ( -e 'provides' ) {
     %provides = get_provides( 'provides', %options );
+    $buildspec{provides} = [ keys %provides ];
   }
 
+  my $resources_path = $options{resources} // 'resources';
   my $resources;
 
-  if ( -e 'resources' ) {
-    $resources = get_resources('resources');
+  if ( -e $resources_path ) {
+    $resources = get_resources($resources_path);
+    $buildspec{resources} = $resources;
   }
 
   my $META_MERGE = 'META_MERGE ' . $FAT_ARROW;
@@ -354,25 +428,42 @@ sub write_makefile {
     );
   }
 
-  my $timestamp        = scalar localtime;
-  my $min_perl_version = $options{'min-perl-version'};
+  my $timestamp = scalar localtime;
 
-  my $min_perl_version_str
-    = defined $min_perl_version
-    ? qq{MIN_PERL_VERSION => '$min_perl_version',}
-    : $EMPTY;
+  my $MIN_PERL_VERSION = $options{'min-perl-version'} // $PERL_VERSION;
 
-  my $pl_files = {};
+  $buildspec{'min-perl-version'} = $MIN_PERL_VERSION;
 
-  if ( $options{'pl-files'} ) {
-    foreach ( @{ $options{'pl-files'} } ) {
-      my $target = $_;
-      $target =~ s/[.].*$//xsm;
-      $pl_files->{$_} = $target;
+  #  From: https://metacpan.org/pod/ExtUtils::MakeMaker
+  #
+  #  MakeMaker can run programs to generate files for you at build
+  #  time. By default any file named *.PL (except Makefile.PL and
+  #  Build.PL) in the top level directory will be assumed to be a Perl
+  #  program and run passing its own basename in as an argument. This
+  #  basename is actually a build target, and there is an intention, but
+  #  not a requirement, that the *.PL file make the file passed to to as
+  #  an argument. For example...
+  #
+  # perl foo.PL foo
+  #
+  my %pl_list;
+
+  my $pl_files = $options{'pl-files'};
+
+  if ( $pl_files && -s $pl_files ) {
+    my @file_list = split /\n/xsm, slurp_file($pl_files);
+
+    foreach my $pl_file (@file_list) {
+      my ( $file, $target ) = split /\s+/xsm, $_;
+      $pl_list{$file} = $target;
     }
+
+    $buildspec{'pl-files'} = \%pl_list;
   }
 
-  $pl_files = Dumper($pl_files);
+  my $PL_FILES = Dumper( \%pl_list );
+
+  $buildspec{postamble} = $options{postamble};
 
   my $MAKEFILE = <<"END_OF_TEXT";
 # autogenerated by $PROGRAM_NAME on $timestamp
@@ -388,16 +479,16 @@ if ( -d 'share' ) {
 }
 
 WriteMakefile(
-  NAME           => '$options{module}',
-  $min_perl_version_str
-  AUTHOR         => '$author',
-  VERSION_FROM   => '$version_from',
-  ABSTRACT       => '$module_abstract',
-  LICENSE        => 'perl',
-  PL_FILES       => $pl_files,
-  EXE_FILES      => $exe_files,
-  PREREQ_PM      => $pre_req,
-  BUILD_REQUIRES => {
+  NAME             => '$PM_MODULE',
+  MIN_PERL_VERSION => '$MIN_PERL_VERSION',
+  AUTHOR           => '$AUTHOR',
+  VERSION_FROM     => '$VERSION_FROM',
+  ABSTRACT         => '$MODULE_ABSTRACT',
+  LICENSE          => 'perl',
+  PL_FILES         => $PL_FILES,
+  EXE_FILES        => $EXE_FILES,
+  PREREQ_PM        => $PRE_REQ,
+  BUILD_REQUIRES   => {
     'ExtUtils::MakeMaker'     => '6.64',
     'File::ShareDir::Install' => $NO_VERSION,
     },
@@ -405,7 +496,7 @@ WriteMakefile(
     'ExtUtils::MakeMaker'     => '6.64',
     'File::ShareDir::Install' => $NO_VERSION,
     },
-  TEST_REQUIRES => $test_req,
+  TEST_REQUIRES => $TEST_REQ,
   $META_MERGE
 );
 END_OF_TEXT
@@ -445,7 +536,32 @@ END_OF_MAKEFILE
 
   DEBUG sub { return $MAKEFILE };
 
+  write_buildspec_file( \%buildspec, \%options );
+
   return $SUCCESS;
+}
+
+########################################################################
+sub write_buildspec_file {
+########################################################################
+  my ( $buildspec, $options ) = @_;
+
+  my ( $buildspec_file, $overwrite ) = @{$options}{qw(create-buildspec overwrite)};
+
+  return
+    if !$buildspec_file;
+
+  die "$buildspec_file exists\n"
+    if -e $buildspec_file && !$overwrite;
+
+  open my $fh, '>', $buildspec_file
+    or die "could not open $buildspec_file for writing\n";
+
+  print {$fh} Dump($buildspec);
+
+  close $fh;
+
+  return;
 }
 
 ########################################################################
@@ -831,8 +947,8 @@ sub parse_buildspec {
     $args{M} = $buildspec->{min_perl_version};
   }
 
-  if ( $buildspec->{version_from} ) {
-    $args{V} = $buildspec->{version_from};
+  if ( $buildspec->{'version_from'} || $buildspec->{'version-from'} ) {
+    $args{V} = $buildspec->{version_from} // $buildspec->{'version-from'};
   }
 
   if ( $options{'project-root'} ) {
@@ -844,12 +960,18 @@ sub parse_buildspec {
   }
 
   if ( $buildspec->{exe_files} ) {
-    $args{e} = create_executables_file( $project_root, $buildspec->{exe_files} );
+    $args{e} = create_temp_filelist( $project_root, $buildspec->{exe_files} );
+  }
+
+  if ( $buildspec->{tests} ) {
+    $args{t} = create_temp_filelist( $project_root, $buildspec->{tests} );
   }
 
   if ( $buildspec->{scripts} ) {
-    $args{S} = create_executables_file( $project_root, $buildspec->{scripts} );
+    $args{S} = create_temp_filelist( $project_root, $buildspec->{scripts} );
   }
+
+  %args = write_resources( $buildspec->{resources}, %args );
 
   %args = parse_project( $buildspec->{project}, %args );
 
@@ -869,8 +991,6 @@ sub parse_buildspec {
   );
 
   %args = write_provides( $buildspec->{provides}, %args );
-
-  %args = write_resources( $buildspec->{resources}, %args );
 
   %args = write_pl_files( $buildspec->{pl_files}, %args );
 
@@ -905,18 +1025,20 @@ sub parse_buildspec {
     delete $args{$k};
   }
 
+  DEBUG Dumper( [ args => \%args ] );
+
   return %args;
 }
 
 ########################################################################
-sub create_executables_file {
+sub create_temp_filelist {
 ########################################################################
-  my ( $project_root, $executables ) = @_;
+  my ( $project_root, $filelist ) = @_;
 
-  if ( ref $executables && reftype($executables) eq 'ARRAY' ) {
-    my ( $fh, $filename ) = tempfile( 'executables-XXXXX', TMPDIR => $TRUE );
+  if ( ref $filelist && reftype($filelist) eq 'ARRAY' ) {
+    my ( $fh, $filename ) = tempfile( 'make-cpan-dist-XXXXX', TMPDIR => $TRUE );
 
-    foreach my $file ( @{$executables} ) {
+    foreach my $file ( @{$filelist} ) {
       my $path = $file =~ /^\//xsm ? $file : "$project_root/$file";
 
       die "error: no such file $path\n"
@@ -929,11 +1051,11 @@ sub create_executables_file {
 
     return $filename;
   }
-  elsif ( !ref $executables ) {
-    return $executables
-      if -e $executables;
+  elsif ( !ref $filelist ) {
+    return $filelist
+      if -e $filelist;
 
-    die "no such file $executables\n";
+    die "no such file $filelist\n";
   }
 }
 
@@ -1044,30 +1166,86 @@ sub validate_object {
   return $err ? $FALSE : $TRUE;
 }
 
-# +-------------------------+
-# | MAIN SCRIPT STARTS HERE |
-# +-------------------------+
+########################################################################
+sub fetch_relative_filelist {
+########################################################################
+  my ( $project_root, $file ) = @_;
 
+  my @file_list = grep { !!$_ } split /\n/xsm, slurp_file($file);
+
+  foreach (@file_list) {
+    s/$project_root\/?//xsm;
+  }
+
+  return \@file_list;
+}
+
+########################################################################
+sub slurp_file {
+########################################################################
+  my ($file) = @_;
+
+  open my $fh, '<', $file
+    or die "could not open $file for reading\n";
+
+  my $content = <$fh>;
+
+  close $fh;
+
+  return $content;
+}
+
+########################################################################
 sub main {
-  my %options = ( cleanup => 1, pager => 1 );
-
-  GetOptions(
-    \%options,            'abstract|A=s',        'author|a=s',           'buildspec|b=s',
-    'build-requires|B=s', 'cleanup!',            'core-modules!',        'dryrun',
-    'debug|D',            'exe-files=s',         'help|h',               'log-level|l=s',
-    'module|m=s',         'require-versions|R!', 'min-perl-version|M=s', 'requires|r=s',
-    'pager|P!',           'project-root|p=s',    'scandeps|s',           'test-requires=s',
-    'verbose|V',          'version|v',           'version-from=s',       'work-dir|w=s',
-    'pl-files=s@',        'postamble=s',
+########################################################################
+  my @option_specs = qw(
+    abstract|A=s
+    author|a=s
+    build-requires|B=s
+    buildspec|b=s
+    cleanup!
+    core-modules!
+    create-buildspec=s
+    debug|D
+    dryrun
+    exe-files|e=s
+    exec-path=s
+    extra-path=s
+    help|h
+    log-level|l=s
+    min-perl-version|M=s
+    module-path=s
+    module|m=s
+    overwrite
+    pager|P!
+    pl-files=s
+    postamble=s
+    project-root|p=s
+    recurse
+    require-versions|R!
+    requires|r=s
+    resources=s
+    scandeps|s
+    scripts-path=s
+    test-requires|t=s
+    tests-path=s
+    verbose|V
+    version-from=s
+    version|v
+    work-dir|w=s
   );
 
-  if ( $options{help} ) {
+  my %options = ( cleanup => 1, pager => 1 );
+
+  my $retval = GetOptions( \%options, @option_specs );
+
+  if ( !$retval || $options{help} ) {
     help( \%options );
 
     exit;
   }
 
-  $options{'project-root'} //= getcwd;
+  $options{'project-root'} //= $ENV{PROJECT_HOME} // getcwd;
 
   $options{'yaml-spec'} = get_yaml_specfile;
 
@@ -1121,6 +1299,7 @@ sub main {
   Log::Log4perl->easy_init($log_level);
 
   if ( $options{buildspec} ) {
+
     my %args = parse_buildspec(%options);
 
     if ($log_level) {
@@ -1134,10 +1313,10 @@ sub main {
     }
 
     if ( !$options{dryrun} ) {
-      exec '@bindir@/make-cpan-dist ' . join $SPACE, %args;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      exec 'make-cpan-dist ' . join $SPACE, %args;
     }
     else {
-      print '@bindir@/make-cpan-dist ' . ( join $SPACE, %args ) . $NL;  ## no critic (ValuesAndExpressions::RequireInterpolationOfMetachars)
+      print 'make-cpan-dist ' . ( join $SPACE, %args ) . $NL;
     }
   }
   else {
@@ -1147,7 +1326,7 @@ sub main {
     croak 'no dependencies'
       if !$options{requires};
 
-    $options{author}   = $options{author}   // 'Anonyous <anonymous@example.com>';
+    $options{author}   = $options{author}   // 'Anonymouse <anonymouse@example.com>';
     $options{abstract} = $options{abstract} // 'my awesome Perl module!';
 
     if ( !write_makefile(%options) ) {
@@ -1205,6 +1384,7 @@ resources:
     type: "type:string"
 scripts:
 exe_files:
+version-from: "type:string"
 
 =pod
 

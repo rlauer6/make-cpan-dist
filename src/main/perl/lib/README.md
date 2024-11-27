@@ -34,25 +34,35 @@ necessary options.  When [using the bash script](#using-the-bash-script), it wil
 
 # OPTIONS
 
-    -c, --cleanup             cleanup files, this is default
-        --no-cleanup
-    -a, --author              author
-    -A, --any                 do not require a version
-    -B, --build-requires      build dependencies
-    -b, --buildspec           read a buildspec and create command line
-    -d, --abstract            abstract
-    -l, --log-level           ERROR, WARN, INFO, DEBUG, TRACE
-    -m, --module              module name
-    -M, --module-list         list of modules to include in distribution
-    -p, --project-root        default: current working directory
-    -P, --pager, --no-pager   use a pager for help, default: use pager
-    -r, --requires            dependency list
-    -R, --require-versions    add version numbers to dependencies
-        --no-require-versions
-    -t, --test-requires       test dependencies
-    -s, --scandeps            use scandeps for dependency checking
-    -v, --version             version
-    --pl-files                name of a script to include in the PL_FILES section
+    -a, --author                author
+    -A, --abstract              description of the module
+    -B, --build-requires        build dependencies
+    -b, --buildspec             read a buildspec and create command line
+        --cleanup, --no-cleanup remove temp files, default: cleanup
+        --create-buildspec      name of a buildspec file to create
+    -d, --debug                 debug mode
+        --dryrun                dryrun
+        --exe-files             path to the executables list
+        --extra-path            path to the extra files list
+    -h, --help                  help
+    -l, --log-level             ERROR, WARN, INFO, DEBUG, TRACE
+    -m, --module                module name
+    -M, --min-perl-version      minimum perl version to consider core, default: $PERL_VERSION
+    -P, --pager, --no-pager     use a pager for help, default: use pager
+        --pl-files              path to the PL_FILES list (see perldoc ExtUtils::MakeMaker)
+        --postamble             name of the file containing the postamble instructions
+    -p, --project-root          default: current working directory
+        --recurse               whether to recurse directors when searching for files
+    -r, --requires              dependency list
+    -R, --require-versions      add version numbers to dependencies
+        --no-require-versions   
+        --scripts-path          path to the scripts listing
+    -t, --test-requires         test dependencies
+        --tests-path            path to the tests listing
+    -s, --scandeps              use scandeps for dependency checking
+    -V, --verbose               verbose output
+    -v, --version               version
+        --version-from          module name that provide version
 
     This script is typically called with the C<--buildspec> option
     specifying a YAML file that contains the options for building a CPAN
@@ -61,6 +71,10 @@ necessary options.  When [using the bash script](#using-the-bash-script), it wil
 
     When invoked with a buildspec it will parse the YAML file and call
     the bash script that actually creates the CPAN distribution.
+
+    Note: Set the environment variable C<PRESERVE_MAKEFILE> if you want
+    the script to preserve the F<Makefile.PL>.  It will be copied to your
+    current working directory.
 
     See https://github.com/rlauer6/make-cpan-dist.git for more documentation.
 
@@ -122,6 +136,34 @@ toolchain. The format of the YAML build file is described below.
     temporary files, use the `--no-cleanup` option if you want to examine
     some of the temporary files.
 
+- -C, --create-buildspec
+
+    Name of a buildspec file to create from the options passed to this
+    script.
+
+    _Note that this file may need to be modified if the options passed to
+    the file are not sufficient to create an acceptable buildspec._
+
+- -d, --debug
+
+    Debug mode. Outputs lot's of diagnostics for debugging the
+    interpretation of the options passed and the `Makefile.PL` creation
+    process.
+
+- --dryrun
+
+    Typically used when calling the bash script directly, this will output
+    the command to be executed and all of the options to
+    `make-cpan-dist.pl`.
+
+- -h, --help
+
+    Print the options to `make-cpan-dist.pl` to STDOUT. For more help try
+    `make-cpan-dist -h` for the options to the bash script.
+
+    Additional information can be found
+    [here](https://github.com/rlauer/make-cpan-dist)
+
 - -l, --log-level
 
     Log level.
@@ -134,20 +176,45 @@ toolchain. The format of the YAML build file is described below.
 
     Name of the Perl module to package.
 
-- -M, --module-list
+- -M, --min-perl-version
 
-    The name of a file that contains the list of modules to include in
-    distribution.
+    The minium version of perl to consider core when resolving dependencies.
+
+- -P, --pager, --no-pager
+
+    Use a pager for help.
+
+    default: --pager
+
+- --pl-files
+
+    Path to the PL\_FILE list.
+
+    From: https://metacpan.org/pod/ExtUtils::MakeMaker
+
+    _MakeMaker can run programs to generate files for you at build time. By
+    default any file named \*.PL (except Makefile.PL and Build.PL) in the
+    top level directory will be assumed to be a Perl program and run
+    passing its own basename in as an argument. This basename is actually
+    a build target, and there is an intention, but not a requirement, that
+    the \*.PL file make the file passed to to as an argument. For
+    example..._
+
+        perl foo.PL foo
 
 - --postamble
 
     Name of a file that contains the `Makefile.PL` postamble section.
 
-- -R, --require-versions, --no-require-versions
+- -p, --project-root
 
-    Whether to add version numbers to dependencies.
+    Root of the project to use when looking for files to package.
 
-    default: --require-versions
+    default: current working directory
+
+- --recurse
+
+    Recurse sub-directories when looking for files to package.
 
 - -r, --requires
 
@@ -155,12 +222,22 @@ toolchain. The format of the YAML build file is described below.
 
     default: requires
 
+- -R, --require-versions, --no-require-versions
+
+    Whether to add version numbers to dependencies.
+
+    default: --require-versions
+
 - -s, --scandeps
 
     Use `scandeps.pl` for dependency checking instead of
-    `scandeps-static.pl` ([Module::ScanDeps:::Static](https://metacpan.org/pod/Module%3A%3AScanDeps%3A%3A%3AStatic)).
+    `scandeps-static.pl` ([Module::ScanDeps::Static](https://metacpan.org/pod/Module%3A%3AScanDeps%3A%3AStatic)).
 
     default: `scandeps-static.pl`
+
+- --scripts-path
+
+    Path to the file containing a list of script files.
 
 - -t, --test-requires
 
@@ -168,13 +245,22 @@ toolchain. The format of the YAML build file is described below.
 
     default: test-requires
 
+- --tests-path
+
+    Path to the file containing a list of test files.
+
+- -V, --verbose
+
+    Verbose output.
+
 - -v, --version
 
     Returns the version of this script.
 
-Note: Set the environment variable `PRESERVE_MAKEFILE` if you want
-the script to preserve the `Makefile.PL`.  It will be copied to your
-current working directory.
+- --version-from
+
+    Name of the module that provides the package version. Defaults to the
+    main module being packaged.
 
 # BUILD SPECIFICATION FORMAT
 
@@ -191,7 +277,6 @@ Example:
     include-version: no
     dependencies:
       resolver: scandeps
-      path: requires
       requires: requires
       test_requires: test-requires
       required_modules: no

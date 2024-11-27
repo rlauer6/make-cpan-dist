@@ -13,36 +13,40 @@ Utility to create a CPAN distribution. See 'man make-cpan-dist'
 
 Options
 -------
--a author       - author (ex: Anonymouse <anonymouse@example.org>)
--A any version  - do not include version numbers for required modules
--b buildspec    - use a buildspec file instead of options
--B file         - use file as the build dependency list
--c core modules - include core modules (default is to omit)
--d description  - description to be included CPAN
--D file         - use file as the dependency list
--T file         - use file as the test dependency list
--e path         - path for extra .pl files to package
--h              - help
--H project home - project home, defaults to '..'
--f file         - file containing a list of extra files to include
--F postamble    - file containing additional make instructions
--l path         - path to Perl modules
--L log level    - logging level 1=error, 5=trace
--m name         - module name
--M perl version - minimum perl version
--n no require   - do not include 'require' modules
--o dir          - output directory (default: current directory)
--p              - preserve Makefile.PL
--P file         - file that contains a list of modules to be packaged
--r pgm          - script or program to list dependencies
--s              - use scandeps.pl to find dependncies
--S              - path for script files
--R yes/no       - recurse directories for files to package (default: yes)
--t path         - path to test files
--v              - more verbose output
--V              - version from module
--x              - do not cleanup files
--y              - name of a file containing PL_FILES entries
+-a author           - author (ex: Anonymouse <anonymouse@example.org>)
+-A any version      - do not include version numbers for required modules
+-b buildspec        - use a buildspec file instead of options
+-B file             - use file as the build dependency list
+-c core modules     - include core modules (default is to omit)
+-C create buildspec - create a buildspec file
+-d description      - description to be included CPAN
+-D file             - use file as the dependency list
+-T file             - use file as the test dependency list
+-e path             - path for extra .pl files to package
+-h                  - help
+-H project home     - project home, defaults to '..'
+-f file             - file containing a list of extra files to include
+-F postamble        - file containing additional make instructions
+-l path             - path to Perl modules
+-L log level        - logging level 1=error, 5=trace
+-m name             - module name
+-M perl version     - minimum perl version
+-n no require       - do not include 'require' modules
+-o dir              - output directory (default: current directory)
+-O overwrite        - overwrite the buildspec.yml file
+-p                  - preserve Makefile.PL
+-P file             - file that contains a list of modules to be packaged
+-s                  - use scandeps.pl to find dependncies
+-S                  - path for script files
+-r pgm              - script or program to list dependencies
+-R yes/no           - recurse directories for files to package (default: yes)
+-t path             - path to test files
+-v                  - more verbose output
+-V                  - version from module
+-x                  - do not cleanup files
+-y                  - name of a file containing PL_FILES entries
+-z                  - dryrun
+-Z                  - resources file
 
 * NOCLEANUP=1, PRESERVE_MAKEFILE=1 can also be passed as environment
   variables.
@@ -158,6 +162,7 @@ function cleanup {
     test -n "$exe_files" && rm "$exe_files"
     test -n "$scripts" && rm "$scripts"
     test -n "$depfile" && rm "$depfile"
+    test -n "$resources" && rm "$resources"
     
     if test -n "$workdir"; then
         for a in *.tmp; do
@@ -259,9 +264,6 @@ function executables() {
         else
             if test -f "$executables"; then
                 cat $executables >> $filelist;
-                if  [[ "$executables" =~ executables-[A-Za-z]{5} ]]; then
-                    rm $executables
-                fi
             else
                 echo "no such file $executables"
                 exit 1
@@ -282,17 +284,20 @@ PERLTIDY=$(command -v perltidy);
 PERL=$(command -v perl);
 MAKE_CPAN_DIST=$(command -v make-cpan-dist.pl)
 
-while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@"; do
+while getopts "?Aa:b:B:cC:d:D:e:f:F:g:hH:l:L:m:M:no:OpP:r:R:sS:t:T:vV:xy:zZ:" arg "$@"; do
 
     case "${arg}" in
+
+        a)
+            author="$OPTARG";
+            ;;
 
         A)
             ANY_VERSION="1";
             ;;
 
-        a)
-            author="$OPTARG";
-            ;;
+        b) BUILDSPEC="$OPTARG";
+           ;;
 
         B)
             if test -e "$OPTARG"; then
@@ -302,19 +307,20 @@ while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@
             fi
             ;;
         
-        b) BUILDSPEC="$OPTARG";
-           ;;
-
         c)
             CORE_MODULES="--core-modules";
             ;;
 
-        D)
-            dependency_file="$OPTARG";
+        C)
+            CREATE_BUILDSPEC="--create-buildspec $OPTARG";
             ;;
 
         d)
             description="$OPTARG";
+            ;;
+
+        D)
+            dependency_file="$OPTARG";
             ;;
 
         e)
@@ -344,14 +350,14 @@ while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@
             PROJECT_HOME="$OPTARG";
             ;;
         
-        L)
-            LOG_LEVEL="$OPTARG";
-            ;;
-        
         l)
             perl5libdir="$OPTARG";
             ;;
 
+        L)
+            LOG_LEVEL="$OPTARG";
+            ;;
+        
         m)
             MODULE="$OPTARG";
             ;;
@@ -365,23 +371,26 @@ while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@
         o)
             destdir="$OPTARG";
             ;;
-        P)
-            provides="$OPTARG";
-            test -n "$provides" && recurse_directories="no"
+
+        O)
+            OVERWRITE="1";
             ;;
 
         p)
             PRESERVE_MAKEFILE="1";
             ;;
 
-        R)
-            recurse_directories="$OPTARG";
+        P)
+            provides="$OPTARG";
+            test -n "$provides" && recurse_directories="no"
             ;;
-
 
         r)
             PERL_REQUIRES="perl_requires";
             REQUIRES="$OPTARG"
+            ;;
+        R)
+            recurse_directories="$OPTARG";
             ;;
 
         s)
@@ -391,12 +400,12 @@ while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@
         S)
             scriptsdir="$OPTARG";
             ;;
-        T)
-            test_dependency_file="$OPTARG";
-            ;;
 
         t)
             testsdir="$OPTARG";
+            ;;
+        T)
+            test_dependency_file="$OPTARG";
             ;;
 
         v)
@@ -405,7 +414,6 @@ while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@
 
         V)
             VERSION_FROM="$OPTARG";
-            shift;
             ;;
 
         x)
@@ -413,16 +421,24 @@ while getopts "h?Ab:B:D:e:F:spg:t:a:m:d:r:l:o:vxf:R:P:zT:L:cS:M:H:ny:V:" arg "$@
             ;;
 
         y)
-            PL_FILE="$OPTARG";
+            PL_FILES="$OPTARG";
             ;;
 
         z)
             DRYRUN="--dryrun";
-            shift;
             ;;
-        
+        Z)
+            RESOURCES="$OPTARG";
+            ;;
     esac
 done
+
+if test -n "$CREATE_BUILDSPEC" && test -z "$OVERWRITE"; then
+    if test -e "$CREATE_BUILDSPEC"; then
+        echo "$CREATE_BUILDSPEC already exists"
+        exit 1
+    fi
+fi
 
 if test -n "$DEBUG"; then
     if [ "$DEBUG" = "1" ]; then
@@ -524,6 +540,8 @@ fi
 
 if test -n "$EXTRA"; then
     if test -s "$EXTRA"; then
+        EXTRA_PATH="$EXTRA";
+
         while IFS=' ' read -r a b
         do
             INFO "$a $b"
@@ -559,18 +577,35 @@ fi
 all_files=$(mktemp)
 
 executables $bindir $all_files
+EXEC_PATH=$bindir
 
 executables $scriptsdir $all_files
+SCRIPTS_PATH=$scriptsdir
 
 test -s $all_files && sort -u $all_files > $exe_files
 
 test -n $NOCLEANUP || rm $all_files
 ########################################################################
+# resources
+if test -e "resources"; then
+    RESOURCES="resources"
+elif test -z "$RESOURCES"; then
+    if test -d "$PROJECT_HOME/.git"; then
+        URL="$(git config --get remote.origin.web)";
+        resources=$(mktemp)
+
+        URL=$URL perl -MJSON -e \
+        'print JSON->new->pretty->encode({ repository => { web => "$ENV{URL}", type => "git" }, homepage => "", bugtracker => { web => ""}});' > $resources
+        RESOURCES="$resources"
+    fi
+fi
 
 # set 'recurse' to 'no' and 'provides' to some value to specify your
 # own set of files to package
+
 if [ "$recurse_directories" = "yes" ]; then
     find -L ${PROJECT_HOME}/${perl5libdir} -type f -name '*.pm' > $package_files;
+    MODULE_PATH="--module-path ${perl5libdir}"
 else
     if test -n "$provides"; then
         if test -s "$provides"; then
@@ -585,6 +620,7 @@ else
     else
         # must package the module at least?
         echo "${PROJECT_HOME}/${perl5libdir}/$module_file" >$package_files
+        PATH_SPEC=${perl5libdir}
     fi
 fi
 
@@ -661,6 +697,8 @@ fi
 
 if test -n "$testsdir"; then
     if test -d "${PROJECT_HOME}/$testsdir"; then
+        TESTS_PATH="$testsdir"
+
         testsfile=$(mktemp);
 
         find -L ${PROJECT_HOME}/$testsdir -type f -name '*.t' > $testsfile
@@ -669,6 +707,7 @@ if test -n "$testsdir"; then
             INFO "no tests found in [$testsdir]...proceeding anyway."
             rm "$testsfile"
             testsfile=""
+            TESTS_PATH=""
         fi
         
         test -d ${builddir}/t || mkdir ${builddir}/t
@@ -713,10 +752,6 @@ test -n "$DEBUG" && EXTRA_OPTIONS="--debug"
 
 REQUIRE_VERSION=$(test -z $ANY_VERSION || echo "-R")
 
-if test -n "$PL_FILE"; then
-  PL_FILE_OPTS=$(cat $PL_FILE)
-fi
-
 # extra Makefile instructions
 if test -n "$POSTAMBLE"; then
     if test -e "$POSTAMBLE"; then
@@ -726,17 +761,30 @@ fi
 
 # create the Makefile.PL
 export PROJECT_HOME=$PROJECT_HOME
+
+if [[ $recurse_directories = "yes" ]]; then
+   RECURSE="--recurse";
+fi
+
+test -n "$EXEC_PATH" && EXEC_PATH="--exec-path=$EXEC_PATH"
+test -n "$SCRIPTS_PATH" && SCRIPTS_PATH="--scripts-path=$SCRIPTS_PATH"
+test -n "$TESTS_PATH" && TESTS_PATH="--tests-path=$TESTS_PATH"
+test -n "$EXTRA_PATH" && EXTRA_PATH="--extra-path=$EXTRA_PATH"
 test -n "$VERSION_FROM" && VERSION_FROM="--version-from $VERSION_FROM"
+test -n "$OVERWRITE" && OVERWRITE="--overwrite"
+test -n "$RESOURCES" && RESOURCES="--resources $RESOURCES"
+test -n "$PL_FILES" && PL_FILES="--pl-files $PL_FILES"
 
 if ! PROJECT_HOME=$PROJECT_HOME $MAKE_CPAN_DIST \
             $CORE_MODULES $BUILD_REQUIRES -r ${workdir}/requires \
             -e $exe_files $TESTREQUIRES  $min_perl_version \
-            -w ${builddir} $EXTRA_OPTIONS \
-            -l $LOG_LEVEL $PL_FILE_OPTS $REQUIRE_VERSION \
-            -m "$MODULE" $VERSION_FROM \
-            -A "$description" \
-            -a "$author" > $builddir/Makefile.PL; then
-    ERROR "could not successfully create Makefile.PL"
+            -w ${builddir} $EXTRA_OPTIONS $RECURSE \
+            -l $LOG_LEVEL $PL_FILES $REQUIRE_VERSION \
+            -m "$MODULE" $VERSION_FROM $OVERWRITE $CREATE_BUILDSPEC \
+            -A "$description"  $RESOURCES \
+            -a "$author" $EXTRA_PATH $MODULE_PATH $EXEC_PATH $SCRIPTS_PATH $TESTS_PATH \
+            > $builddir/Makefile.PL; then
+    ERROR "could not create Makefile.PL"
     exit 1
 fi
 

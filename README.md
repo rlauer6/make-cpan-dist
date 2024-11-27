@@ -10,7 +10,6 @@ use__ script for creating CPAN distributions.
 * [README](#readme)
 * [Overview](#overview)
 * [Quick Start](#quick-start)
-  * [Build and Install](#build-and-install)
 * [More Details](#more-details)
 * [Perl Dependencies](#perl-dependencies)
 * [What Next?](#what-next)
@@ -32,7 +31,7 @@ use__ script for creating CPAN distributions.
 # Overview
 
 Historically, because I have been using the Redhat Package Manager to
-create RPMs of Perl modules that can be installed as part of my
+create RPMs of Perl modules I install as part of my
 application stacks, I don't bother with the creation of CPAN
 distributions.
 
@@ -66,32 +65,29 @@ Debian based system then you may have success using `apt` to install
 the necessary dependencies. There are also some Perl module
 dependencies that are checked when you run `./configure`.
 
-This recipe should work for you on a Debian based system.
+The `build` script in the root directory attempts to build the
+software for several different Linux distro flavors.
 
 ```
-apt-get update
-apt-get install -y git automake autoconf curl
-curl -L https://cpanmin.us | perl - App::cpanminus
 git clone https://github.com/rlauer6/make-cpan-dist
 cd make-cpan-dist
 ./build
 ```
 
-If you want to do this in pieces take a look at the [build script](build).
+If you want to do this in pieces take a look at the [build
+script](build).
 
-[Back to Table of Contents](#table-of-contents)
-
-## Build and Install
+The build script essentially does the following after installing
+dependencies:
 
 ```
-git clone https://github.com/rlauer6/make-cpan-dist.git .
 ./bootstrap
 ./configure
-make & sudo make install
+make & make install
 ```
 
 > HINT: If you want to install locally, set `--prefix` during the
-> configure process.
+> configure process or update the `build` script.
 
 ```
 ./configure --prefix=$HOME/local
@@ -244,11 +240,11 @@ possibly a pointer to the project in a git repository that will be
 cloned.
 
 You must also provide the name of the Perl module to package
-(`pm_module`) and include a `path:` section that will point the
+(`pm_module`) and include a `path:` section that will point to the
 modules and artifacts to be packaged.
 
 The `path` attributes specify the path to the module, the path to the
-tests and the path to executable scriopts which will be included in
+tests and the path to executable scripts which will be included in
 the distribution.  All files with an extension of `.t` are assumed to
 be included in the package if you have specified a test path.
 
@@ -512,8 +508,13 @@ SCRIPTS = \
 $(PROJECT): buildspec.yml $(MODULES) $(SCRIPTS)
 	make-cpan-dist.pl -b $<
 
+CLEANFILES = \
+    $(PROJECT)
+
 clean:
-	rm $(PROJECT)
+	for a in $(CLEANFILES); do \
+	  rm -f "$(PROJECT)"; \
+	done
 ```
 
 ...which could also be accomplished from the command line:
@@ -561,33 +562,15 @@ So, in no particular order...
 * Ubiquity of the toolchain
 * Potential portability (nothing is 100% portable, but we can try)
 
-...automate, automate, automate...so you can do something like this
-after creating automation scripts that create CPAN distribution files:
-
-```
-SUBDIRS = .
-
-CPAN_DIST_MAKER=/usr/local/libexec/make-cpan-dist.pl
-
-cpan: buildspec.yml
-        $(CPAN_DIST_MAKER) -b $<
-
-.PHONY: cpan
-
-clean-local:
-        rm -f *.tar.gz
-```
-...and then of course:
-
-```
-make cpan
-```
-
 I also leverage _autoconfiscation_ templates to create things like man
 pages from Perl scripts and of course the installation process is made
 simpler when you can rely on some degree of portability and
 standardization of your toolchain. Many disagree and hate `autoconf` -
 I get it - but it's not a holy war.
+
+Take a look at
+[autoconf-template-perl](https://github.com/rlauer6/autoconf-template-perl)
+if you are curious about how to _autoconfiscate_ a Perl project.
 
 [Back to Table of Contents](#table-of-contents)
 
@@ -595,7 +578,7 @@ I get it - but it's not a holy war.
 
 Files in the `extra-files` section of the `buildspec.yml` file or in
 the `extra-files` file are packaged as part of the distribution
-tarball but will not installed _unless you add them to the `share:`
+tarball but will not be installed _unless you add them to the `share:`
 section beneath `extra-files`.  In that case they will be installed
 relative to the distribution's share directory.
 

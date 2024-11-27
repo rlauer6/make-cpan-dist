@@ -56,25 +56,35 @@ C<Makefile.PL> and before creating your CPAN distribution.
 
 =head1 OPTIONS
 
- -c, --cleanup             cleanup files, this is default
-     --no-cleanup
- -a, --author              author
- -A, --any                 do not require a version
- -B, --build-requires      build dependencies
- -b, --buildspec           read a buildspec and create command line
- -d, --abstract            abstract
- -l, --log-level           ERROR, WARN, INFO, DEBUG, TRACE
- -m, --module              module name
- -M, --module-list         list of modules to include in distribution
- -p, --project-root        default: current working directory
- -P, --pager, --no-pager   use a pager for help, default: use pager
- -r, --requires            dependency list
- -R, --require-versions    add version numbers to dependencies
-     --no-require-versions
- -t, --test-requires       test dependencies
- -s, --scandeps            use scandeps for dependency checking
- -v, --version             version
- --pl-files                name of a script to include in the PL_FILES section
+ -a, --author                author
+ -A, --abstract              description of the module
+ -B, --build-requires        build dependencies
+ -b, --buildspec             read a buildspec and create command line
+     --cleanup, --no-cleanup remove temp files, default: cleanup
+     --create-buildspec      name of a buildspec file to create
+ -d, --debug                 debug mode
+     --dryrun                dryrun
+     --exe-files             path to the executables list
+     --extra-path            path to the extra files list
+ -h, --help                  help
+ -l, --log-level             ERROR, WARN, INFO, DEBUG, TRACE
+ -m, --module                module name
+ -M, --min-perl-version      minimum perl version to consider core, default: $PERL_VERSION
+ -P, --pager, --no-pager     use a pager for help, default: use pager
+     --pl-files              path to the PL_FILES list (see perldoc ExtUtils::MakeMaker)
+     --postamble             name of the file containing the postamble instructions
+ -p, --project-root          default: current working directory
+     --recurse               whether to recurse directors when searching for files
+ -r, --requires              dependency list
+ -R, --require-versions      add version numbers to dependencies
+     --no-require-versions   
+     --scripts-path          path to the scripts listing
+ -t, --test-requires         test dependencies
+     --tests-path            path to the tests listing
+ -s, --scandeps              use scandeps for dependency checking
+ -V, --verbose               verbose output
+ -v, --version               version
+     --version-from          module name that provide version
 
  This script is typically called with the C<--buildspec> option
  specifying a YAML file that contains the options for building a CPAN
@@ -83,6 +93,10 @@ C<Makefile.PL> and before creating your CPAN distribution.
 
  When invoked with a buildspec it will parse the YAML file and call
  the bash script that actually creates the CPAN distribution.
+
+ Note: Set the environment variable C<PRESERVE_MAKEFILE> if you want
+ the script to preserve the F<Makefile.PL>.  It will be copied to your
+ current working directory.
 
  See https://github.com/rlauer6/make-cpan-dist.git for more documentation.
 
@@ -146,6 +160,34 @@ Cleanup temp directories and files.  The default is to cleanup all
 temporary files, use the C<--no-cleanup> option if you want to examine
 some of the temporary files.
 
+=item -C, --create-buildspec
+
+Name of a buildspec file to create from the options passed to this
+script.
+
+I<Note that this file may need to be modified if the options passed to
+the file are not sufficient to create an acceptable buildspec.>
+
+=item -d, --debug
+
+Debug mode. Outputs lot's of diagnostics for debugging the
+interpretation of the options passed and the F<Makefile.PL> creation
+process.
+
+=item --dryrun
+
+Typically used when calling the bash script directly, this will output
+the command to be executed and all of the options to
+F<make-cpan-dist.pl>.
+
+=item -h, --help
+
+Print the options to F<make-cpan-dist.pl> to STDOUT. For more help try
+C<make-cpan-dist -h> for the options to the bash script.
+
+Additional information can be found
+L<here|https://github.com/rlauer/make-cpan-dist>
+
 =item -l, --log-level
 
 Log level.
@@ -158,26 +200,57 @@ default: error
 
 Name of the Perl module to package.
 
-=item -M, --module-list
+=item -M, --min-perl-version
 
-The name of a file that contains the list of modules to include in
-distribution.
+The minium version of perl to consider core when resolving dependencies.
+
+=item -P, --pager, --no-pager
+
+Use a pager for help.
+
+default: --pager
+
+=item --pl-files
+
+Path to the PL_FILE list.
+
+From: https://metacpan.org/pod/ExtUtils::MakeMaker
+
+I<MakeMaker can run programs to generate files for you at build time. By
+default any file named *.PL (except Makefile.PL and Build.PL) in the
+top level directory will be assumed to be a Perl program and run
+passing its own basename in as an argument. This basename is actually
+a build target, and there is an intention, but not a requirement, that
+the *.PL file make the file passed to to as an argument. For
+example...>
+
+ perl foo.PL foo
 
 =item --postamble
 
 Name of a file that contains the C<Makefile.PL> postamble section.
 
-=item -R, --require-versions, --no-require-versions
+=item -p, --project-root
 
-Whether to add version numbers to dependencies.
+Root of the project to use when looking for files to package.
 
-default: --require-versions
+default: current working directory
+
+=item --recurse
+
+Recurse sub-directories when looking for files to package.
 
 =item -r, --requires
 
 Name of a file that contains the list of dependencies if other than F<requires>.
 
 default: requires
+
+=item -R, --require-versions, --no-require-versions
+
+Whether to add version numbers to dependencies.
+
+default: --require-versions
 
 =item -s, --scandeps
 
@@ -186,21 +259,35 @@ F<scandeps-static.pl> (L<Module::ScanDeps::Static>).
 
 default: F<scandeps-static.pl>
 
+=item --scripts-path
+
+Path to the file containing a list of script files.
+
 =item -t, --test-requires
 
 Name of the file that contains the dependencies for running tests included in your distribution if other than F<test-requires>.
 
 default: test-requires
 
+=item --tests-path
+
+Path to the file containing a list of test files.
+
+=item -V, --verbose
+
+Verbose output.
+
 =item -v, --version
 
 Returns the version of this script.
 
+=item --version-from
+
+Name of the module that provides the package version. Defaults to the
+main module being packaged.
+
 =back
 
-Note: Set the environment variable C<PRESERVE_MAKEFILE> if you want
-the script to preserve the F<Makefile.PL>.  It will be copied to your
-current working directory.
 
 =head1 BUILD SPECIFICATION FORMAT
 
@@ -217,7 +304,6 @@ Example:
   include-version: no
   dependencies:
     resolver: scandeps
-    path: requires
     requires: requires
     test_requires: test-requires
     required_modules: no
