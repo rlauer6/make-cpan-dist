@@ -1,3 +1,10 @@
+Thu Feb 27 15:04:23 2025  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.41]:
+	* VERSION: bump
+	* src/main/bash/bin/make-cpan-dist.in
+	- fix hang when no tests (.t) files found
+
 Sun Nov 24 07:41:58 2024  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.40]:

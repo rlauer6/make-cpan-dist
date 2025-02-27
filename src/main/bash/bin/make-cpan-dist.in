@@ -695,25 +695,28 @@ if test -z "$dependency_file"; then
     get_module_versions ${workdir}/requires.tmp > ${workdir}/requires
 fi
 
+
 if test -n "$testsdir"; then
+
     if test -d "${PROJECT_HOME}/$testsdir"; then
         TESTS_PATH="$testsdir"
 
         testsfile=$(mktemp);
 
-        find -L ${PROJECT_HOME}/$testsdir -type f -name '*.t' > $testsfile
-        
-        if ! test -s "$testsfile"; then
+        find -L "${PROJECT_HOME}/$testsdir" -type f -name '*.t' > $testsfile
+
+        if ! test -e "$testsfile"; then
             INFO "no tests found in [$testsdir]...proceeding anyway."
             rm "$testsfile"
             testsfile=""
             TESTS_PATH=""
+        else
+            test -d ${builddir}/t || mkdir ${builddir}/t
+
+            for a in $(cat $testsfile); do
+                cp $a ${builddir}/t/
+            done
         fi
-        
-        test -d ${builddir}/t || mkdir ${builddir}/t
-        for a in $(cat $testsfile); do
-            cp $a ${builddir}/t/
-        done
     else
         FATAL_ERROR "no test directory [${PROJECT_HOME}/$testsdir]"
     fi
