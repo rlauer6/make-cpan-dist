@@ -78,7 +78,7 @@ necessary options.  When [using the bash script](#using-the-bash-script), it wil
 
     See https://github.com/rlauer6/make-cpan-dist.git for more documentation.
 
-    Version: 1.5.41
+    Version: 1.5.42
 
 # USING THE BASH SCRIPT
 
@@ -266,7 +266,7 @@ toolchain. The format of the YAML build file is described below.
 
 Example:
 
-    version: 1.5.41
+    version: 1.5.42
     project:
       git: https://github.com/rlauer6/perl-Amazon-Credentials
       description: "AWS credentials discoverer"
