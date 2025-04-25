@@ -18,7 +18,8 @@ cpan: buildspec.yml
 	test -n "$(SCANDEPS)" && SCANDEPS="-s"; \
 	test -n "$(NOVERSION)" && NOVERSION="-n"; \
 	PROJECT_ROOT="--project-root $$(readlink -f ..)"; \
-	$(CPAN_DIST_MAKER) $$PROJECT_ROOT $$REQUIRES $$DRYRUN $$SCANDEPS $$NOVERSION $$NOCLEANUP $$DEBUG -b $< || echo "$$?"
+	$(CPAN_DIST_MAKER) $$PROJECT_ROOT $$REQUIRES $$DRYRUN \
+	   $$SCANDEPS $$NOVERSION $$NOCLEANUP $$DEBUG -b $< || false
 
 # handle n.m.r-b version format (but don't use this anymore!)
 	if test -n "$$(echo $(package_version) | grep '\-')"; then \
