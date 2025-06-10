@@ -35,6 +35,8 @@ core
 config.status
 config.log
 make-cpan-dist.spec
+cpan/requires.tmp
+cpan/provides.tmp
 autom4te.cache/
 src/main/perl/**/*.pm
 src/main/perl/**/*.pl

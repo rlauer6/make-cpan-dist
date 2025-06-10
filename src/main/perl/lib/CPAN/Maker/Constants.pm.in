@@ -9,7 +9,7 @@ our $VERSION = '@PACKAGE_VERSION@';  ## no critic (RequireInterpolation)
 
 our @EXPORT_OK = ();
 
-use ReadonlyX;
+use Readonly;
 
 # booleans
 Readonly our $TRUE       => 1;
