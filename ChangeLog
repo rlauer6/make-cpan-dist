@@ -1,3 +1,9 @@
+Mon Jun 23 06:23:28 2025  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.46]:
+	* src/main/bash/bin/make-cpan-dist.in
+	- tests will be run if SKIP_TESTS not '' or '1'
+
 Tue Jun 10 10:20:00 2025  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.45]:

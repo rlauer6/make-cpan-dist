@@ -957,7 +957,9 @@ else
 
         cp *.tar.gz $destdir
 
-        [[ -n "$SKIP_TESTS" ]] || make test
+        if [[ -z "$SKIP_TESTS" ]] || ! [[ "$SKIP_TESTS" = "1" ]]; then
+            make test
+        fi
 
         if [[ -n "$PRESERVE_MAKEFILE" ]]; then
             cp Makefile.PL $destdir
