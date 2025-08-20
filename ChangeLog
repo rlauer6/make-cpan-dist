@@ -1,3 +1,11 @@
+Wed Aug 20 12:36:16 2025  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.5.47]:
+	* VERSION: bump
+	* README.md: generated
+	* src/main/perl/lib/File/Process/Utils.pm.in
+	- really get rid of ReadonlyX
+
 Mon Jun 23 06:23:28 2025  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.5.46]:
