@@ -121,7 +121,7 @@ problems that might arise if you "go off script"
 
 =head1 VERSION
 
-@PACKAGE_VERSION@
+This documentation refers to version @PACKAGE_VERSION@
 
 =head1 USING THE BASH SCRIPT
 

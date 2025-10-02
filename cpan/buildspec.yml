@@ -6,9 +6,9 @@ project:
 pm_module: CPAN::Maker
 min-perl-version: 5.010
 dependencies:
-  requires: requires
-  test_requires: test-requires
-  build_requires: build-requires
+  requires: cpan/requires
+  test_requires: cpan/test-requires
+  build_requires: cpan/build-requires
 path:
   pm_module: src/main/perl/lib
   tests: src/main/perl/lib/t

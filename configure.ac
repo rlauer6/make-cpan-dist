@@ -137,10 +137,11 @@ if test -z "$PERL" ; then
   AC_MSG_ERROR([perl not found?])
 fi
 
-ads_PERL_MODULE([ReadonlyX], [], [1.04])
+ads_PERL_MODULE([Readonly], [], [])
 ads_PERL_MODULE([JSON], [], [4.10])
 ads_PERL_MODULE([IO::Pager], [OPTIONAL])
 ads_PERL_MODULE([Log::Log4perl], [], [1.55])
+ads_PERL_MODULE([List::Util], [], [1.33])
 ads_PERL_MODULE([YAML::Tiny], [], [1.73])
 ads_PERL_MODULE([Text::CSV_XS], [], [])
 ads_PERL_MODULE([Pod::Checker], [], [])

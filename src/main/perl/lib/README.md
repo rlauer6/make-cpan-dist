@@ -95,7 +95,7 @@ the bash script that actually creates the CPAN distribution.
 
 # VERSION
 
-1.5.47
+This documentation refers to version 1.6.0
 
 # USING THE BASH SCRIPT
 
@@ -287,7 +287,7 @@ project's root directory, **NOT THE CURRENT WORKING DIRECTORY!**_
 
 Example:
 
-    version: 1.5.47
+    version: 1.6.0
     project:
       git: https://github.com/rlauer6/perl-Amazon-Credentials
       description: "AWS credentials discoverer"

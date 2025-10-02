@@ -22,7 +22,7 @@ if test -z "$CPANM"; then
 fi
 
 # Perl module dependencies
-for a in $(cat *requires | perl -ne 'chomp; ($a,$b)=split/\s+/; printf "%s%s\n", $a, $b ne "0" ? "\@$b" : "";'); do \
+for a in $(cat cpan/*requires | perl -ne 'chomp; ($a,$b)=split/\s+/; printf "%s%s\n", $a, $b ne "0" ? "\@$b" : "";'); do \
     cpanm -n -v $a; \
 done
 
