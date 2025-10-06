@@ -1,3 +1,12 @@
+Mon Oct  6 08:58:58 2025  Rob Lauer  <rlauer6@comcast.net>
+
+	[1.6.1]:
+	* VERSION: bump
+	* configure.ac
+	- add Pod::Markdown
+	- fix Markdown::Render
+	* src/main/perl/lib/README.md: generated
+
 Thu Oct  2 08:01:50 2025  Rob Lauer  <rlauer6@comcast.net>
 
 	[1.6.0]:

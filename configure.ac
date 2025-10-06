@@ -146,7 +146,8 @@ ads_PERL_MODULE([YAML::Tiny], [], [1.73])
 ads_PERL_MODULE([Text::CSV_XS], [], [])
 ads_PERL_MODULE([Pod::Checker], [], [])
 ads_PERL_MODULE([Pod::Find], [], [])
-ads_PERL_MODULE([Markdown::Render], [], 1.60.1])
+ads_PERL_MODULE([Pod::Markdown], [], [])
+ads_PERL_MODULE([Markdown::Render], [], [1.60.1])
 
 perl5libdir=\${datadir}/perl5
 AC_ARG_WITH(
