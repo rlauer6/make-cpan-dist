@@ -105,8 +105,6 @@ sub write_extra_files {
 
   my ( $extra_files, $extra, $project_root ) = @params{qw(extra_files extra project_root)};
 
-  my %args = %{ $params{args} };
-
   $extra_files //= [];
 
   die "ERROR: extra-files must be an array!\n" . Dumper( [ $extra_files, \%params ] )
@@ -160,7 +158,7 @@ sub write_extra_files {
     }
   }
 
-  return %args
+  return
     if !@file_list;
 
   open my $fh, '>', $extra_files_path
@@ -173,57 +171,59 @@ sub write_extra_files {
   close $fh
     or die "ERROR: could not close $extra_files_path\n";
 
-  $args{f} = $extra_files_path;
+  # NOTE: 'extra' (the extra-files output path) has no corresponding
+  # CLI::Simple accessor (not in option_specs, no extra_options
+  # declared) -- there is currently nowhere valid to apply this
+  # value. The file is still written to $extra_files_path above;
+  # only the tracking of that path is unapplied here.
 
-  return %args;
+  return;
 }
 
 ########################################################################
 sub parse_path {
 ########################################################################
-  my ( $self, $project_root, $path, %args ) = @_;
+  my ( $self, $project_root, $path ) = @_;
 
   if ($path) {
     if ( $path->{recurse}
       && $path->{recurse} =~ /(yes|no)/ixsm ) {
-      $args{R} = $path->{recurse};
+      $self->set_recurse( $path->{recurse} eq 'yes' ? $TRUE : $FALSE );
     }
     elsif ( $path->{recurse} ) {
       die "ERROR: use only yes or no for 'recurse' option\n";
     }
 
-    # -l
     if ( $path->{'pm-module'} ) {
-      $args{l} = $path->{'pm-module'};
+      $self->set_module_path( $path->{'pm-module'} );
     }
 
-    if ( $path->{'exclude-files'} ) {
-      $args{E} = $path->{'exclude-files'};
-    }
+    # NOTE: 'exclude-files' has no corresponding CLI::Simple accessor
+    # (not in option_specs, no extra_options declared) -- there is
+    # currently nowhere valid to apply this buildspec.yml value. Left
+    # unapplied rather than guessing at an attribute name that
+    # doesn't exist.
 
-    # -e
     if ( $path->{'exe-files'} ) {
       if ( $self->check_path( $project_root, $path->{'exe-files'}, 'exe-files' ) ) {
-        $args{e} = $path->{'exe-files'};
+        $self->set_exe_files( $path->{'exe-files'} );
       }
     }
 
-    # -S
     if ( $path->{scripts} ) {
       if ( $self->check_path( $project_root, $path->{scripts}, 'scripts' ) ) {
-        $args{S} = $path->{scripts};
+        $self->set_scripts_path( $path->{scripts} );
       }
     }
 
-    # -t
     if ( $path->{tests} ) {
       if ( $self->check_path( $project_root, $path->{tests}, 'tests' ) ) {
-        $args{t} = $path->{tests};
+        $self->set_tests_path( $path->{tests} );
       }
     }
   }
 
-  return %args;
+  return;
 }
 
 ########################################################################

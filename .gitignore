@@ -23,3 +23,5 @@ resources
 bin/upload2cpan
 bin/make-cpan-dist
 bin/cpan-maker
+**/*.raw
+

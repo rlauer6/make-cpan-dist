@@ -31,10 +31,10 @@ BOOTSTRAPPER   := $(shell command -v bootstrapper)
 DOCKER         := $(shell command -v docker)
 GIT            := $(shell command -v git)
 CPAN_MAKER     := $(shell command -v cpan-maker)
-MD_UTILS       := $(shell command -v md-utils.pl)
+MD_UTILS       := $(shell command -v markdown-render)
 POD2MARKDOWN   := $(shell command -v pod2markdown)
 PODEXTRACT     := $(shell command -v podextract)
-SCANDEPS       := $(shell command -v scandeps-static.pl)
+SCANDEPS       := $(shell command -v scandeps-static)
 
 ifeq ($(MD_UTILS),)
     $(warning Markdown::Render is not installed - run: cpanm Markdown::Render to generate .md files from pod)
@@ -52,6 +52,8 @@ CONFIG_READER = CPAN::Maker::Bootstrapper::ConfigReader
 BASEDIR  ?= $(shell perl -M$(CONFIG_READER) -e 'print $(CONFIG_READER)->new("$(CONFIG)")->cpan_maker_basedir;')
 
 MIN_PERL_VERSION ?= 5.010
+
+MIN_PERL_VERSION_FLAG := $(shell v=$$(dnk get .min-perl-version < buildspec.yml 2>/dev/null); [[ -n "$$v" ]] && echo "-m $$v")
 
 ifeq ($(SCANDEPS),)
   SCAN = OFF
@@ -83,6 +85,8 @@ DEPS += \
     $(PERL_MODULES) \
     $(BIN_FILES) \
     requires \
+    recommends \
+    suggests \
     cpanfile \
     test-requires \
     $(UNIT_TEST_NAME) \
@@ -196,115 +200,50 @@ modulino: modulino.tmpl ## creates a bash script that calls your modulino (MODUL
 	test -e .gitignore && { grep -q "$$modulino" .gitignore || echo "$$modulino" >> .gitignore; }; \
 	echo "$$modulino"
 
-define scan-deps
-	dep_requires=$$(mktemp); \
-	packages=$$(mktemp); \
-	cleanfiles="$$cleanfiles $$dep_requires $$packages $(1).tmp"; \
-	min_perl_version=$$(perl -MYAML::Tiny=LoadFile -e 'print LoadFile(q{buildspec.yml})->{q{min-perl-version}};'); \
-	if [[ -n "$$min_perl_version" ]]; then \
-	  min_perl_version="-m $$min_perl_version"; \
-	fi; \
-	for d in $(2); do \
-	  for a in $$(find $$d -name "$(3)"); do \
-	    perl -ne 'print "$$1\n" if /^package +(.*?);/' $$a >> $$packages; \
-	    echo >&2 "Scanning...$$a"; \
-	    $(SCANDEPS) -r $$min_perl_version --no-core $$a | awk '{printf "%s %s\n", $$1,$$2}' >> $$dep_requires; \
-	  done; \
-	done; \
-	if test -s "$$dep_requires"; then \
-	  sort -u $$dep_requires > $(1).tmp; \
-	  grep -vFf "$$packages" "$(1).tmp" > $(1); \
-	else \
-	  touch $(1); \
+requires.raw recommends.raw suggests.raw &: $(SOURCE_FILES) ## single scan producing all three library dependency tiers
+	$(NO_ECHO)printf '%s\n' $(SOURCE_FILES) > file_list.tmp; \
+	$(SCANDEPS) $(MIN_PERL_VERSION_FLAG) \
+	  --raw \
+	  --file-list file_list.tmp \
+	  --no-core --filter \
+	  --requires-file requires.raw \
+	  --recommends-file recommends.raw \
+	  --suggests-file suggests.raw > /dev/null; \
+	rm -f file_list.tmp
+
+test-requires.raw: $(TESTS) ## scan of t/ for test-only dependencies (requires tier only)
+	$(NO_ECHO)printf '%s\n' $(TESTS) > file_list.tmp; \
+	$(SCANDEPS) $(MIN_PERL_VERSION_FLAG) --raw --file-list file_list.tmp --no-core --filter \
+	  --requires-file test-requires.raw > /dev/null; \
+	rm -f file_list.tmp
+
+# shared by requires, recommends, suggests, and test-requires: reconciles
+# a fresh scan (%.raw) against history (skip list + previous run), via
+# `cmb filter`, the same skip/pin/preserve logic used since the
+# bash-script era. Only runs when SCAN=on; otherwise the target is left
+# untouched (whatever's already on disk, or nothing on a fresh checkout).
+%: %.raw
+	$(NO_ECHO)cleanfiles="$@.xxx"; \
+	trap 'rm -f $$cleanfiles' EXIT; \
+	scan="$(SCAN)"; \
+	if [[ "$${scan^^}" = "ON" ]]; then \
+	  if test -e "$@"; then \
+	    cp "$@" "$@.xxx"; \
+	  fi; \
+	  if test -e "$@.xxx"; then \
+	    cmb filter "$<" "$@.skip" "$@.xxx" > $@; \
+	  else \
+	    cp "$<" $@; \
+	  fi; \
 	fi
-endef
-
-define filter_requires = 
-
-  sub get_requires {
-    my ($infile) = @_;
-
-    return {}
-      if !-s $infile;
-
-    my %requires;
-
-    open my $fh, '<', $infile or
-      die "could not open $infile for reading\n";
-
-    while (<$fh>) {
-      chomp;
-      my ($m,$v) = split ' ', $_;
-      $requires{$m} = $v // 0;
-    }
-
-    close $fh;
-
-    return \%requires;
-  }
-
-  my $skip_requires = get_requires("$ENV{REQUIRES}.skip");
-  my $requires_tmp  = get_requires("$ENV{REQUIRES}.xxx");
-  my $requires      = get_requires($ENV{REQUIRES});
-
-  my %new_requires;
-
-  # copy preserved modules (ones preceded with '+')
-  foreach my $m (keys %{$requires_tmp} ) {
-    next if $m !~/^\+/xsm;
-    $new_requires{$m} = $requires_tmp->{$m};
-  }
-
-  foreach my $m (keys %{$requires} ) {
-    # skip modules on skip list
-    next if exists $skip_requires->{$m};
-    next if exists $requires_tmp->{"+$m"};
-
-    # keep modules from preserved list if versions differ (user must have specified specific version)
-    if ( exists $requires_tmp->{$m} && $requires_tmp->{$m} ne $requires->{$m} ) {
-      $new_requires{$m} = $requires_tmp->{$m};
-    }
-    else {
-      $new_requires{$m} = $requires->{$m};
-   }
-  }
-
-  print join q{}, map { "$_ $new_requires{$_}\n" } keys %new_requires;
-
-endef
-
-export s_filter_requires = $(value filter_requires)
 
 requires: $(SOURCE_FILES) ## creates or updates the `requires` file used to populate PREQ_PM section of the Makefile.PL
-	$(NO_ECHO)cleanfiles="$@.tmp $@.xxx"; \
-	trap 'rm -f $$cleanfiles' EXIT; \
-	scan="$(SCAN)"; \
-	if [[ "$${scan^^}" = "ON" ]]; then \
-	  if test -e "$@"; then \
-	    cp "$@" "$@.xxx"; \
-	  fi; \
-	  $(call scan-deps,$@,lib bin,*.p[ml].in); \
-	  if test -e "$@.xxx"; then \
-	    requires_list=$$(REQUIRES="$@" perl -e "$$s_filter_requires"); \
-	    echo "$$requires_list" | sort > "$@"; \
-	  fi; \
-	fi
 
 test-requires: $(TESTS) ## creates or update the `test-requires` file used to populate the TEST_REQUIRES section of the Makefile.PL
-	$(NO_ECHO)cleanfiles="$@.tmp $@.xxx"; \
-	trap 'rm -f $$cleanfiles' EXIT; \
-	scan="$(SCAN)"; \
-	if [[ "$${scan^^}" = "ON" ]]; then \
-	  if test -e "$@"; then \
-	    cp "$@" "$@.xxx"; \
-	  fi; \
-	  $(call scan-deps,$@,t,*.t); \
-	  if test -e "$@.xxx"; then \
-	    requires_list=$$(REQUIRES="$@" perl -e "$$s_filter_requires"); \
-	    echo "$$requires_list" | sort > "$@"; \
-	  fi; \
-	fi
 
+recommends: $(SOURCE_FILES) ## creates or updates the `recommends` file (soft, non-eval conditional dependencies)
+
+suggests: $(SOURCE_FILES) ## creates or updates the `suggests` file (eval-wrapped, optional dependencies)
 
 ChangeLog:
 	$(NO_ECHO)test -e $@ || touch $@
@@ -354,6 +293,7 @@ CLEANFILES += \
     *.tar.gz \
     *.tmp \
     *.xxx \
+    *.raw \
     extra-files \
     provides \
     module.pm.tmpl \
@@ -424,6 +364,15 @@ test: $(GSOURCE_FILES) ## run unit tests
 
 check: $(GSOURCE_FILES) ## syntax check and create source from .in file
 
-deps.mk: $(PERL_MODULES)
+# deps.mk depends on SOURCE (.pm.in), not the built .pm targets.
+# cmb create-deps already scans .pm.in directly, so this makes deps.mk
+# regenerate purely from source edits -- no build artifacts involved,
+# so there's no chicken-and-egg with $(PERL_MODULES) needing to be
+# built before deps.mk can be regenerated, and 'make clean' can never
+# trigger a rebuild through this include (clean doesn't touch .pm.in).
+deps.mk: $(SOURCE_FILES:%=%.in)
 	$(NO_ECHO)cmb create-deps > $@
 
+.PHONY: package
+package: clean ## run lint & scan
+	$(MAKE) LINT=on SCAN=on
