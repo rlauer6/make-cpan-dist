@@ -23,6 +23,13 @@ post-update:
 	  cp "$$src" "$(INCLUDES_DIR)/$$f"; \
 	  chmod -w "$(INCLUDES_DIR)/$$f"; \
 	done; \
+	if [[ -e .gitignore ]]; then \
+	  our_ignore="$$(mktemp)"; sort "$(BOOTSTRAPPER_DIST_DIR)/gitignore" > $$our_ignore; \
+	  their_ignore="$$(mktemp)"; sort .gitignore > $$their_ignore; \
+	  trap 'rm -r $$our_ignore $$their_ignore' EXIT; \
+	  echo "updating .gitignore..."; \
+	  comm -13 $$their_ignore $$our_ignore | tee -a .gitignore; \
+	fi; \
 	echo "Files updated. Review changes with: git diff"
 
 .PHONY: update  ## update managed project files from the installed bootstrapper
