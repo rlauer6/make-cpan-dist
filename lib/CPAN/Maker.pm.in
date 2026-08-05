@@ -10,7 +10,7 @@ use CPAN::Maker::Utils;
 use CLI::Simple::Constants qw(:booleans :chars);
 use CLI::Simple::Utils qw(choose slurp);
 use Carp;
-use Cwd;
+use Cwd qw(getcwd);
 use Data::Dumper;
 use English qw( -no_match_vars );
 use ExtUtils::MM;
@@ -54,6 +54,7 @@ sub init {
   }
 
   my $log_level = $self->get_log_level;
+
   $self->_set_log_level($log_level);
 
   my $project_root = $self->get_project_root;
@@ -102,7 +103,7 @@ sub _set_log_level {
       return {@text_levels}->{$log_level};
     }
     else {
-      $log_level = {@text_levels}->{info};
+      return {@text_levels}->{info};
     }
   };
 
@@ -1569,8 +1570,11 @@ sub stage_distribution {
 
   if ($extra_files) {
     my @file_list;
+    $self->get_logger->debug( Dumper( [ extra_files => $extra_files ] ) );
 
     for my $e ( @{$extra_files} ) {
+      $self->get_logger->debug( Dumper( [ e => $e ] ) );
+
       if ( !ref $e ) {
         push @file_list,
           $self->fetch_file_list(
@@ -1582,6 +1586,16 @@ sub stage_distribution {
       elsif ( ref $e eq 'HASH' ) {
         my ($destdir) = keys %{$e};
         my $file_list = $e->{$destdir};
+
+        $self->get_logger->debug(
+          Dumper(
+            [ destdir      => $destdir,
+              file_list    => $file_list,
+              project_root => $project_root
+            ]
+          )
+        );
+
         push @file_list,
           $self->fetch_file_list(
           file_list    => $file_list,
@@ -1591,13 +1605,22 @@ sub stage_distribution {
       }
     }
 
+    $builddir ||= getcwd;
+
+    $self->get_logger->debug( Dumper( [ file_list => \@file_list, builddir => $builddir ] ) );
+
     for my $entry (@file_list) {
+
       my ( $src, $dest ) = split /\s+/xsm, $entry, 2;
+      $self->get_logger->debug( Dumper( [ src => $src, dest => $dest ] ) );
 
       $src  = "$project_root/$src" if $src !~ /^\//xsm;
       $dest = $dest ? "$builddir/$dest" : "$builddir/" . File::Basename::basename($src);
 
+      $self->get_logger->debug( Dumper( [ src => $src, dest => $dest ] ) );
+
       make_path( File::Basename::dirname($dest) );
+
       cp( $src, $dest )
         or die "ERROR: could not copy $src to $dest: $OS_ERROR\n";
     }

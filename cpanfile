@@ -10,3 +10,4 @@ requires "Readonly", "2.05";
 requires "Role::Tiny", "2.002004";
 requires "Role::Tiny::With", "2.002004";
 requires "YAML::Tiny", "0";
+recommends "JSON::Validator", "5.15";

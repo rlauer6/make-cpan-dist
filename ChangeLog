@@ -1,3 +1,30 @@
+Wed Aug  5 11:12:50 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.0.7]:
+	* release-notes.md: updated
+	* release-notes/release-notes-2.0.6.md: new
+	* VERSION: bump
+	* .includes/bash-completion.mk: updated by CPAN::Maker::Bootstrapper
+	* .includes/modulino.mk: likewise
+	* .gitignore: likewise
+	* .includes/help.mk: likewise
+	* .includes/perl.mk: likewise
+	* .includes/release-notes.mk: likewise
+	* .includes/update.mk: likewise
+	* builder: likewise
+	* Makefile: likewise
+	* cpanfile: likewise
+	* bin/cpan-maker.in: MODULINO_WRAPPER corrected
+	* lib/CPAN/Maker.pm.in
+	(_set_log_level): explicit return in choose block
+	(stage_distribution)
+	- additional debug statements
+	- make sure that builddir is set
+	* lib/CPAN/Maker/Role/FileUtils.pm.in
+	(fetch_file_list)
+	- make sure project root is set
+	- stop removing project root
+
 Thu Jul 23 16:38:57 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.0.6]:
