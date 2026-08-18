@@ -1,8 +1,28 @@
+Tue Aug 18 17:00:00 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.0.8]:
+	* release-notes.md: updated
+	* release-notes/release-notes-2.0.8.md: new
+	* VERSION: bump
+	* .gitignore: + extra-files.mk, local/**
+	* .include/local.mk: added by CPAN::Maker::Bootstrapper
+	* .includes/git.mk: updated by CPAN::Maker::Bootstrapper
+	* .includes/perl.mk: likewise
+	* .includes/update.mk: likewise
+	* .includes/version.mk: likewise
+	* Makefile: likewise
+	* builder: likewise
+	* lib/CPAN/Maker.pm.in
+	(cmd_build)
+	- sort MANIFEST (for reproducibility)
+	(_sort_manifest): new
+	(write_makefile): remove timestamp (for reproducibility)
+
 Wed Aug  5 11:12:50 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.0.7]:
 	* release-notes.md: updated
-	* release-notes/release-notes-2.0.6.md: new
+	* release-notes/release-notes-2.0.7.md: new
 	* VERSION: bump
 	* .includes/bash-completion.mk: updated by CPAN::Maker::Bootstrapper
 	* .includes/modulino.mk: likewise

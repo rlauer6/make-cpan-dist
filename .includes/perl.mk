@@ -4,10 +4,12 @@ PERL       := $(shell command -v perl)
 PERLTIDY   := $(shell command -v perltidy)
 PERLCRITIC := $(shell command -v perlcritic)
 PODCHECKER := $(shell command -v podchecker)
+CPM        := $(shell command -v cpm)
+CARTON     := $(shell command -v carton)
 
 PERL_BIN_FILES = $(patsubst %.pl.in,%.pl,$(filter %.pl.in,$(BIN_FILES:%=%.in)))
 
-PERLINCLUDE ?= -I lib $(addprefix -I ,$(subst :, ,$(PERL5LIB)))
+PERLINCLUDE ?= -I lib -I local/lib/perl5
 
 SYNTAX_CHECKING ?= $(shell $(PERL) -MCPAN::Maker::ConfigReader \
     -e 'print CPAN::Maker::ConfigReader->new->cpan_maker_syntax_checking // q{}' 2>/dev/null)
@@ -78,7 +80,7 @@ define check_syntax_pm
 	  module=$$(echo $@ | perl -npe 's{^lib/}{}; s/\//::/g; s/\.pm$$//;'); \
 	  errfile=$$(mktemp); \
 	  local_cleanfiles="$$local_cleanfiles $$errfile"; \
-	  perl -wc $(PERLINCLUDE) -M"$$module" -e 1 2>$$errfile \
+	  PERL5LIB= perl -wc $(PERLINCLUDE) -M"$$module" -e 1 2>$$errfile \
 	    || { rm -f "$@"; cat $$errfile; exit 1; }; \
 	  podcheck="$$($(PODCHECKER) $@ 2>&1 || true)"; \
 	  echo "$$podcheck" | grep -q "does not contain\|OK" || { rm -f "$@"; echo "$$podcheck"; exit 1; } \
@@ -98,7 +100,7 @@ define check_syntax_pl
 	if [[ "$$skip" -eq 0 ]]; then \
 	  errfile=$$(mktemp); \
 	  local_cleanfiles="$$local_cleanfiles $$errfile"; \
-	  perl -wc $(PERLINCLUDE) -e 1 2>$$errfile \
+	  PERL5LIB= perl -wc $(PERLINCLUDE) -e 1 2>$$errfile \
 	    || { rm -f "$@"; cat $$errfile; exit 1; }; \
 	  podcheck="$$($(PODCHECKER) $@ 2>&1 || true)"; \
 	  echo "$$podcheck" | grep -q "does not contain\|OK" || { rm -f "$@"; echo "$$podcheck"; exit 1; } \
@@ -184,6 +186,11 @@ else
 	$(NO_ECHO)touch "$@"
 endif
 
+# $(call gen-vars-file,PATH): write NAME=value pairs to PATH, values
+# resolved by make and written verbatim (no shell, so quotes/&/spaces in
+# values survive). Caller consumes PATH, then removes it.
+gen-vars-file = $(file >$(1),)$(foreach v,$(TEMPLATE_VARS),$(file >>$(1),$(v)=$($(v))))
+
 # ------------------------------------------------------------------
 # pattern rules
 # ------------------------------------------------------------------
@@ -199,24 +206,24 @@ endif
 # combined rule below builds/checks modules in correct dependency
 # order without needing a separate phase-barrier pass.
 
-%.pm: %.pm.in
+%.pm: %.pm.in | local
+	$(call gen-vars-file,$<.vars)
 	$(NO_ECHO)module_tmp="$$(mktemp)"; \
 	local_cleanfiles="$$module_tmp"; \
-	trap 'rm -f $$local_cleanfiles' EXIT; \
-	sed -e 's/[@]PACKAGE_VERSION[@]/$(VERSION)/' \
-	    -e 's/[@]MODULE_NAME[@]/$(MODULE_NAME)/' $< > "$$module_tmp"; \
+	trap 'rm -f $$local_cleanfiles $<.vars' EXIT; \
+	$(BOOTSTRAPPER) resolve-vars $< > "$$module_tmp"; \
 	$(run_podextract); \
 	rm -f "$@"; \
 	cp "$$module_tmp" "$@"; \
 	chmod -w "$@"; \
 	$(if $(syntax_on),$(check_syntax_pm))
 
-%.pl: %.pl.in
+%.pl: %.pl.in | local
+	$(call gen-vars-file,$<.vars)
 	$(NO_ECHO)local_cleanfiles=""; \
-	trap 'rm -f $$local_cleanfiles' EXIT; \
+	trap 'rm -f $$local_cleanfiles $<.vars' EXIT; \
 	rm -f "$@"; \
-	sed -e 's/[@]PACKAGE_VERSION[@]/$(VERSION)/' \
-	    -e 's/[@]MODULE_NAME[@]/$(MODULE_NAME)/' $< > "$@"; \
+	$(BOOTSTRAPPER) resolve-vars $< > $@; \
 	chmod +x "$@"; \
 	chmod -w "$@"; \
 	$(if $(syntax_on),$(check_syntax_pl))

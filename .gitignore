@@ -25,3 +25,5 @@ bin/make-cpan-dist
 bin/cpan-maker
 **/*.raw
 buildspec.yml.current
+extra-files.mk
+local/**

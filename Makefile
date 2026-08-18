@@ -12,6 +12,8 @@ VERSION := $(shell test -e VERSION || echo 1.0.0 > VERSION; cat VERSION)
 # this is the current version in your Perl path (but not necessarily the version that produced this Makefile)
 BOOTSTRAPPER_VERSION := $(shell perl -MCPAN::Maker::Bootstrapper -e 'print CPAN::Maker::Bootstrapper->VERSION;' 2>/dev/null || true) 
 
+config.mk: ;
+
 -include config.mk
 
 MODULE_NAME  ?= $(shell SOURCE=$$(pwd) perl -MCwd=abs_path -MFile::Basename=basename -e '$$m=basename(abs_path($$ENV{SOURCE})); $$m =~s/\-/::/g; print $$m')
@@ -27,7 +29,7 @@ NO_COLOR ?=
 
 UNIT_TEST_NAME = $(shell TEST_NAME=$(PROJECT_NAME) perl -e 'printf q{t/00-%s.t}, lc $$ENV{TEST_NAME}')
 
-BOOTSTRAPPER   := $(shell command -v bootstrapper)
+BOOTSTRAPPER   := $(shell command -v cmb)
 DOCKER         := $(shell command -v docker)
 GIT            := $(shell command -v git)
 CPAN_MAKER     := $(shell command -v cpan-maker)
@@ -35,6 +37,15 @@ MD_UTILS       := $(shell command -v markdown-render)
 POD2MARKDOWN   := $(shell command -v pod2markdown)
 PODEXTRACT     := $(shell command -v podextract)
 SCANDEPS       := $(shell command -v scandeps-static)
+GITHUB_ACTIONS := $(shell command -v gha-aws)
+CPM            := $(shell command -v cpm)
+CARTON         := $(shell command -v carton)
+
+CPAN_INSTALLER ?= $(firstword $(CPM) $(CARTON))
+
+ifeq ($(CPAN_INSTALLER),)
+  $(warning no cpm/carton found -- set SYNTAX_CHECKING=off if builds fail to find dependencies)
+endif
 
 ifeq ($(MD_UTILS),)
     $(warning Markdown::Render is not installed - run: cpanm Markdown::Render to generate .md files from pod)
@@ -46,6 +57,9 @@ CMB_VERSION_DRIFT ?= fail
 GIT_NAME     ?= $(shell $(GIT) config --global user.name 2>/dev/null || echo "Anonymouse")
 GIT_EMAIL    ?= $(shell $(GIT) config --global user.email 2>/dev/null || echo "anonymouse@example.org")
 GITHUB_USER  ?= $(shell $(GIT) config --global user.github 2>/dev/null || echo "anonymouse")
+
+GIT_SHA      := $(shell $(GIT) rev-parse HEAD 2>/dev/null || echo 'unknown' )
+GIT_DIRTY    := $(shell $(GIT) describe --always --dirty --abbrev=40 2>/dev/null || echo 'unknown')
 
 CONFIG_READER = CPAN::Maker::Bootstrapper::ConfigReader
 
@@ -66,13 +80,18 @@ ifeq ($(BOOTSTRAPPER),)
 endif
 
 define find-files
-$(1) := $(patsubst %.in,%,$(shell for d in $(2); do test -d "$$d" && find $$d -type f -name "$(3)"; done))
+$(1) := $(patsubst %.in,%,$(shell for d in $(2); do test -d "$$d" && \
+  find "$$d" -type f -name "$(3)" \
+    ! -name '#*' ! -name '.#*' ! -name '*~' ! -name '*.bak' ; \
+done | sort))
 endef
 
 $(eval $(call find-files,PERL_MODULES,lib,*.pm.in))
 $(eval $(call find-files,BIN_FILES,bin,*.in))
 $(eval $(call find-files,TESTS,t,*.t))
 $(eval $(call find-files,SOURCE_FILES,lib bin,*.p[ml].in))
+
+SOURCE_FILES_IN := $(addsuffix .in,$(SOURCE_FILES))
 
 POD_MODULES = $(PERL_MODULES:.pm=.pod)
 
@@ -88,6 +107,7 @@ DEPS += \
     recommends \
     suggests \
     cpanfile \
+    local \
     test-requires \
     $(UNIT_TEST_NAME) \
     ChangeLog
@@ -97,16 +117,35 @@ DEPS += \
 .PHONY: all
 all: $(TARBALL)
 
+PACKAGE_VERSION = $(VERSION)
+
+GIT_USER := $(GITHUB_USER)
+
+TEMPLATE_VARS += \
+    PACKAGE_VERSION \
+    MODULE_NAME \
+    GIT_SHA \
+    GIT_DIRTY \
+    GIT_EMAIL \
+    GIT_USER \
+    GIT_NAME \
+    MIN_PERL_VERSION \
+    PROJECT_NAME \
+
+-include .includes/local.mk
+
 include .includes/perl.mk
 
 bin/%.sh: bin/%.sh.in
-	$(NO_ECHO)sed -e 's/[@]PACKAGE_VERSION[@]/$(VERSION)/' \
-	    -e 's/[@]MODULE_NAME[@]/$(MODULE_NAME)/' < $< > $@; \
+	$(call gen-vars-file,$<.vars)
+	$(NO_ECHO)trap 'rm -f $<.vars' EXIT; \
+	$(BOOTSTRAPPER) resolve-vars $< $(TEMPLATE_VARS)  > $@; \
 	chmod +x $@
 
 bin/%: bin/%.in
-	$(NO_ECHO)sed -e 's/[@]PACKAGE_VERSION[@]/$(VERSION)/' \
-	    -e 's/[@]MODULE_NAME[@]/$(MODULE_NAME)/' < $< > $@; \
+	$(call gen-vars-file,$<.vars)
+	$(NO_ECHO)trap 'rm -f $<.vars' EXIT; \
+	$(BOOTSTRAPPER) resolve-vars $< $(TEMPLATE_VARS) > $@; \
 	chmod +x $@
 
 .PHONY: quick
@@ -141,22 +180,13 @@ $(TARBALL): $(DEPS) | update-available \
 	fi; \
 	$(CPAN_MAKER) $$SKIP_TESTS -l $(LOG_LEVEL) $$COLOR -b $<
 
-module.pm.tmpl:
-	$(NO_ECHO)if [[ -n "$(STUB)" ]]; then \
-	  cp --preserve=all --update=none $(STUB) $@; \
-	  chmod +w $@; \
-	else \
-	  template=$$(perl -MFile::ShareDir=dist_file -e 'print dist_file(q{CPAN-Maker-Bootstrapper}, q{class-module.pm.tmpl});' 2>/dev/null || true); \
-	  chmod -f 644 $@ || true; \
-	  touch $@; \
-	fi
-
-$(MODULE_PATH).in: module.pm.tmpl
-	$(NO_ECHO)mkdir -p $$(dirname $@); \
-	test -e $@ || sed -e 's/[@]MODULE_NAME[@]/$(MODULE_NAME)/' \
-	    -e 's/[@]GIT_NAME[@]/$(GIT_NAME)/' \
-	    -e 's/[@]GIT_EMAIL[@]/$(GIT_EMAIL)/' < $< > $@; \
-	rm $<
+$(MODULE_PATH).in:
+	$(NO_ECHO)tmpl=$$(perl -MFile::ShareDir=dist_file -e 'print dist_file(q{CPAN-Maker-Bootstrapper}, q{class-module.pm.tmpl})' 2>/dev/null); \
+	[[ -n "$(STUB)" ]] && tmpl="$(STUB)"; \
+	$(call gen-vars-file,$@.vars); \
+	trap 'rm -f $@.vars' EXIT; \
+	mkdir -p $$(dirname $@); \
+	$(BOOTSTRAPPER) resolve-vars "$$tmpl" $(TEMPLATE_VARS) > $@
 
 test.t.tmpl:
 	$(NO_ECHO)template=$$(perl -MFile::ShareDir=dist_file -e 'print dist_file(q{CPAN-Maker-Bootstrapper}, q{$@});' 2>/dev/null || true); \
@@ -168,7 +198,9 @@ test.t.tmpl:
 	chmod 0644 $@
 
 $(UNIT_TEST_NAME): | test.t.tmpl
-	$(NO_ECHO)sed -e 's/[@]MODULE_NAME[@]/$(MODULE_NAME)/' < test.t.tmpl > $@
+	$(call gen-vars-file,$<.vars)
+	$(NO_ECHO)trap 'rm -f $<.vars' EXIT; \
+	$(BOOTSTRAPPER) resolve-vars test.t.tmpl $(TEMPLATE_VARS) > $@
 
 ifeq ($(wildcard README.md.in),)
 # If README.md.in does NOT exist, use POD2MARKDOWN on the module
@@ -199,8 +231,8 @@ endif
 
 .INTERMEDIATE: requires.raw recommends.raw suggests.raw test-requires.raw
 
-requires.raw recommends.raw suggests.raw &: $(SOURCE_FILES) ## single scan producing all three library dependency tiers
-	$(NO_ECHO)printf '%s\n' $(SOURCE_FILES) > file_list.tmp; \
+requires.raw recommends.raw suggests.raw &: $(SOURCE_FILES_IN) ## single scan producing all three library dependency tiers
+	$(NO_ECHO)printf '%s\n' $(SOURCE_FILES_IN) > file_list.tmp; \
 	$(SCANDEPS) $(MIN_PERL_VERSION_FLAG) \
 	  --raw \
 	  --file-list file_list.tmp \
@@ -232,13 +264,13 @@ test-requires.raw: $(TESTS) ## scan of t/ for test-only dependencies (requires t
 	  cmb filter "$<" "$@.skip" "$@.xxx" > $@; \
 	fi
 
-requires: $(SOURCE_FILES) ## creates or updates the `requires` file used to populate PREQ_PM section of the Makefile.PL
+requires: $(SOURCE_FILES_IN) ## creates or updates the `requires` file used to populate PREQ_PM section of the Makefile.PL
 
 test-requires: $(TESTS) ## creates or update the `test-requires` file used to populate the TEST_REQUIRES section of the Makefile.PL
 
-recommends: $(SOURCE_FILES) ## creates or updates the `recommends` file (soft, non-eval conditional dependencies)
+recommends: $(SOURCE_FILES_IN) ## creates or updates the `recommends` file (soft, non-eval conditional dependencies)
 
-suggests: $(SOURCE_FILES) ## creates or updates the `suggests` file (eval-wrapped, optional dependencies)
+suggests: $(SOURCE_FILES_IN) ## creates or updates the `suggests` file (eval-wrapped, optional dependencies)
 
 ChangeLog:
 	$(NO_ECHO)test -e $@ || touch $@
@@ -253,20 +285,15 @@ buildspec.yml.tmpl:
 	chmod 0644 $@
 
 buildspec.yml: | buildspec.yml.tmpl
+	$(call gen-vars-file,buildspec.yml.tmpl.vars)
 	$(NO_ECHO)buildspec=$$(mktemp); \
+	trap 'rm -f buildspec.yml.tmpl.vars' EXIT; \
 	specfile="$(PROJECT_NAME)"; \
 	specfile="$${specfile,,}.yml"; \
 	if [[ -e "$$specfile" ]]; then \
 	  share_files="    - $$specfile\n"; \
 	fi; \
-	trap 'rm -f $$buildspec' EXIT; \
-	sed -e 's/[@]MODULE_NAME[@]/$(MODULE_NAME)/g' \
-	    -e 's/[@]GIT_NAME[@]/$(GIT_NAME)/g' \
-	    -e 's/[@]GITHUB_USER[@]/$(GITHUB_USER)/g' \
-	    -e 's/[@]GIT_EMAIL[@]/$(GIT_EMAIL)/g' \
-	    -e 's/[@]PROJECT_NAME[@]/$(PROJECT_NAME)/g' \
-	    -e "s/[@]SHARE_FILES[@]/$$share_files/g" \
-	    -e 's/[@]MIN_PERL_VERSION[@]/$(MIN_PERL_VERSION)/g' buildspec.yml.tmpl > $$buildspec; \
+	SHARE_FILES="$$share_files" $(BOOTSTRAPPER) resolve-vars buildspec.yml.tmpl > $$buildspec; \
 	if test -e resources.yml; then \
 	  cat resources.yml >> $$buildspec; \
 	  rm resources.yml; \
@@ -290,6 +317,7 @@ CLEANFILES += \
     *.xxx \
     *.raw \
     extra-files \
+    extra-files.mk \
     provides \
     module.pm.tmpl \
     release-*.{lst,diffs} \
@@ -329,11 +357,11 @@ workflow:
 	echo "** Add to your repo:"; \
 	echo "git add build-requires builder .github/workflows/build.yml"
 
-DOCKER_BUILD_IMAGE ?= debian:trixie
-BRANCH             ?= $(shell git branch --show-current)
-BUILDER            ?= builder
-BUILD_LOG          ?= $(shell echo "build-$$(date +'%Y%m%d%H%M%S').log")
-INSTALLER          ?= cpm
+DOCKER_BUILD_IMAGE    ?= debian:trixie
+BRANCH                ?= $(shell git branch --show-current)
+BUILDER               ?= builder
+BUILD_LOG             ?= $(shell echo "build-$$(date +'%Y%m%d%H%M%S').log")
+DOCKER_CPAN_INSTALLER ?= cpm
 
 .PHONY: build-ci
 build-ci:
@@ -345,7 +373,7 @@ build-ci:
 	  -v "$$(pwd)/$(BUILDER):/builder:ro" \
 	  -v "$$(pwd):/$$(basename $$(pwd))" \
 	  -e GITHUB_REF_NAME=$(BRANCH) \
-	  -e INSTALLER=$(INSTALLER) \
+	  -e INSTALLER=$(DOCKER_CPAN_INSTALLER) \
 	  -e REPO=$$(basename  -s .git "$$(git remote get-url origin)") \
 	  $(DOCKER_BUILD_IMAGE) /builder "$$repo_url" 2>&1 | tee $(BUILD_LOG); \
 	end_time=$$(date +%s); \
@@ -367,9 +395,29 @@ check: $(GSOURCE_FILES) ## syntax check and create source from .in file
 # so there's no chicken-and-egg with $(PERL_MODULES) needing to be
 # built before deps.mk can be regenerated, and 'make clean' can never
 # trigger a rebuild through this include (clean doesn't touch .pm.in).
-deps.mk: $(SOURCE_FILES)
-	$(NO_ECHO)cmb create-deps > $@
+deps.mk: $(SOURCE_FILES_IN)
+	$(NO_ECHO)cmb create-deps > $@.tmp && test -s $@.tmp && mv $@.tmp $@ || { rm -f $@.tmp; false; }
 
 .PHONY: package
 package: clean ## run lint & scan
 	$(MAKE) LINT=on SCAN=on
+
+# we want to trigger a rebuild of the tarball if any changes is made
+# to our files being added to the distribition (non-source) either in
+# the root of the tarball or in the share directory.
+# 'extra-files' is created by cpan-maker from buildspec.yml
+#
+# this recipe will then add a new file to be included
+# extra-files.mk. Now whenever buildspec.yml changes we'll get a new
+# extra-files.mk
+
+# extra-files.mk:  $(TARBALL): share/foo.tpl share/bar.tpl 
+
+extra-files.mk: buildspec.yml
+	$(NO_ECHO)if [[ -e extra-files ]]; then \
+	  printf '$$(TARBALL): %s\n' "$$(awk 'NF{print $$1}' extra-files | tr '\n' ' ')" > $@; \
+	else \
+	  : > $@; \
+	fi
+
+-include extra-files.mk

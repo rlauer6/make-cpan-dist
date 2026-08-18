@@ -7,6 +7,7 @@ MANAGED_FILES = \
     bash-completion.mk \
     modulino.mk \
     perl.mk \
+    local.mk \
     release-notes.mk
 
 BOOTSTRAPPER_DIST_DIR := $(shell perl -MFile::ShareDir=dist_dir \
