@@ -206,7 +206,9 @@ gen-vars-file = $(file >$(1),)$(foreach v,$(TEMPLATE_VARS),$(file >>$(1),$(v)=$(
 # combined rule below builds/checks modules in correct dependency
 # order without needing a separate phase-barrier pass.
 
-%.pm: %.pm.in | local
+LOCAL_PREREQ := $(if $(syntax_on),local)
+
+%.pm: %.pm.in | $(LOCAL_PREREQ)
 	$(call gen-vars-file,$<.vars)
 	$(NO_ECHO)module_tmp="$$(mktemp)"; \
 	local_cleanfiles="$$module_tmp"; \
@@ -218,7 +220,7 @@ gen-vars-file = $(file >$(1),)$(foreach v,$(TEMPLATE_VARS),$(file >>$(1),$(v)=$(
 	chmod -w "$@"; \
 	$(if $(syntax_on),$(check_syntax_pm))
 
-%.pl: %.pl.in | local
+%.pl: %.pl.in | $(LOCAL_PREREQ)
 	$(call gen-vars-file,$<.vars)
 	$(NO_ECHO)local_cleanfiles=""; \
 	trap 'rm -f $$local_cleanfiles $<.vars' EXIT; \

@@ -35,7 +35,9 @@ use Role::Tiny::With;
 with 'CPAN::Maker::Role::ModuleUtils';
 with 'CPAN::Maker::Role::FileUtils';
 
-our $VERSION = '@PACKAGE_VERSION@';
+our $VERSION   = '@PACKAGE_VERSION@';
+our $GIT_SHA   = '@GIT_SHA@';
+our $GIT_DIRTY = '@GIT_DIRTY@';
 
 __PACKAGE__->use_log4perl( level => 'info', color => $FALSE );
 

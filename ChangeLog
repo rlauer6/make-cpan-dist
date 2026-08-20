@@ -1,3 +1,16 @@
+Thu Aug 20 12:39:08 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.0.9]:
+	* release-notes.md: updated
+	* release-notes/release-notes-2.0.9.md: new
+	* VERSION: bump
+	* .includes/perl.mk: update by CPAN::Maker::Bootstrapper
+	* builder: likewise
+	* cpanfile: + File::ShareDir::Install
+	* requires: likewise
+	* lib/CPAN/Maker.pm.in
+	- + $GIT_SHA, $GIT_DIRTY
+
 Tue Aug 18 17:00:00 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.0.8]:
