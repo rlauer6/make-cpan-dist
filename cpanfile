@@ -3,6 +3,7 @@ requires "CLI::Simple::Constants", "2.1.2";
 requires "CLI::Simple::Utils", "2.1.2";
 requires "File::Process", "1.0.0";
 requires "File::ShareDir", "1.118";
+requires "File::ShareDir::Install", "0";
 requires "JSON", "4.10";
 requires "Log::Log4perl::Level", "0";
 requires "Module::CPANfile", "0";

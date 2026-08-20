@@ -1,3 +1,4 @@
++File::ShareDir::Install 0
 +Module::CPANfile 0
 CLI::Simple 2.1.2
 CLI::Simple::Constants 2.1.2
